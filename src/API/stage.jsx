@@ -1,7 +1,7 @@
 // Stage API functions
 // Mirrors backend routes in initiative/stages.js
 
-const BASE = `${import.meta.env.VITE_BACKEND_URL}/api/stages`;
+const BASE = `/api/stages`;
 
 // POST /api/stages/:initiative_id
 // Body: { name }

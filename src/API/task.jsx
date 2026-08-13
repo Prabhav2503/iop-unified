@@ -1,7 +1,7 @@
 // Task API functions
 // Mirrors backend routes in tasks.js
 
-const BASE = `${import.meta.env.VITE_BACKEND_URL}/api/tasks`;
+const BASE = `/api/tasks`;
 
 // GET /api/tasks/all
 // Returns: { data: Task[] } | { error: string }

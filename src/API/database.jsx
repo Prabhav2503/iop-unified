@@ -1,7 +1,7 @@
 // Database API functions
 // Handles backend routes for /api/database
 
-const BASE = `${import.meta.env.VITE_BACKEND_URL}/api/databases`;
+const BASE = `/api/databases`;
 
 // GET /api/database/all
 // Returns: { data: DatabaseRecord[] } | { error: string }

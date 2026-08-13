@@ -1,7 +1,7 @@
 // Contact API functions
 // Mirrors backend routes in contactroutes.js
 
-const BASE = `${import.meta.env.VITE_BACKEND_URL}/api/contacts`;
+const BASE = `/api/contacts`;
 
 // GET /api/contacts
 // Returns all contacts with full fields

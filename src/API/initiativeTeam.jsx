@@ -1,7 +1,7 @@
 // Initiative Team API functions
 // Mirrors backend routes in initiative/initiative_teams.js
 
-const BASE = `${import.meta.env.VITE_BACKEND_URL}/api/initiative-teams`;
+const BASE = `/api/initiative-teams`;
 
 // POST /api/initiative-teams/:initiative_id
 // Body: team_ids (array of team_id UUIDs)

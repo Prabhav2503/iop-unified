@@ -1,7 +1,7 @@
 // Initiative API functions
 // Mirrors backend routes in initiatives.js
 
-const BASE = `${import.meta.env.VITE_BACKEND_URL}/api/initiatives`;
+const BASE = `/api/initiatives`;
 
 // GET /api/initiatives/all
 // Returns: { data: Initiative[] } | { error: string }

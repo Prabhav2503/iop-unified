@@ -1,7 +1,7 @@
 // Startup API functions
 // Mirrors backend routes in startup/startuproutes.js
 
-const BASE = `${import.meta.env.VITE_BACKEND_URL}/api/startups`;
+const BASE = `/api/startups`;
 
 // GET /api/startups/all
 // Returns summary list: { id, name, sector, description, founder_id, created_at, stage, engagement }

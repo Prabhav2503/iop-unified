@@ -1,7 +1,7 @@
 // Team API functions
 // Mirrors backend routes in teamroutes.js
 
-const BASE = `${import.meta.env.VITE_BACKEND_URL}/api/teams`;
+const BASE = `/api/teams`;
 
 // GET /api/teams/all
 // Returns summary list: { id, name, role, email, vertical }
