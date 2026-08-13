@@ -1,20 +1,27 @@
-import jwt from "jsonwebtoken";
+import { SignJWT, jwtVerify } from "jose";
 import dotenv from "dotenv";
 import { validationResult } from "express-validator";
 
 dotenv.config();
 
-export const tokengenerator = (payload) => {
-  const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "1d" });
+const getSecret = () => new TextEncoder().encode(process.env.JWT_SECRET);
+
+export const tokengenerator = async (payload) => {
+  const secret = getSecret();
+  const token = await new SignJWT(payload)
+    .setProtectedHeader({ alg: "HS256" })
+    .setExpirationTime("1d")
+    .sign(secret);
   return token;
 };
 
-export const verifytoken = (token) => {
+export const verifytoken = async (token) => {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    return decoded;
+    const secret = getSecret();
+    const { payload } = await jwtVerify(token, secret);
+    return payload;
   } catch (err) {
-    throw new Error({msg:"Invalid token", error:err});
+    throw new Error("Invalid token: " + err.message);
   }
 };
 

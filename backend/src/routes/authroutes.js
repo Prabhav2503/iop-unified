@@ -39,7 +39,7 @@ router.post("/login", loginClientValidator, async (req, res) => {
         ? data.role.split(",").map((item) => item.trim()).filter(Boolean)
         : [];
 
-    const token = tokengenerator({
+    const token = await tokengenerator({
       userid: data.id,
       profile_id: data.profile_id,
       username: data.username,

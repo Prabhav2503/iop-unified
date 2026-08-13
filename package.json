@@ -20,7 +20,7 @@
     "dotenv": "^17.4.2",
     "express": "^4.22.2",
     "express-validator": "^7.3.2",
-    "jsonwebtoken": "^9.0.3",
+    "jose": "^6.2.8",
     "lucide-react": "^1.28.0",
     "md5": "^2.3.0",
     "react": "^19.2.7",
