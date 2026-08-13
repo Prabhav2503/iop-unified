@@ -6,7 +6,7 @@ export const handleLogin = async (username, password) => {
 
     try {
         const hashedPassword = md5(password).toString();
-        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/login`, {
+        const response = await fetch(`/api/login`, {
             method: "POST",
             credentials: "include",
             headers: {
@@ -30,7 +30,7 @@ export const handleLogin = async (username, password) => {
 
 export const handleLogout = async () => {
     try {
-        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/logout`, {
+        const response = await fetch(`/api/logout`, {
             method: "POST",
             credentials: "include",
             headers: {
@@ -59,7 +59,7 @@ export const changePassword = async (currentPassword, newPassword, profile_id) =
         const hashedCurrent = md5(currentPassword).toString();
         const hashedNew = md5(newPassword).toString();
 
-        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/update-password`, {
+        const response = await fetch(`/api/update-password`, {
             method: "PUT",
             credentials: "include",
             headers: {
@@ -82,4 +82,4 @@ export const changePassword = async (currentPassword, newPassword, profile_id) =
     } catch (err) {
         return { error: err.message || "Failed to update password" };
     }
-}
+}
