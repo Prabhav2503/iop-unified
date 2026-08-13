@@ -1,7 +1,13 @@
-// This file is the Vercel Serverless Function entrypoint.
-// Vercel automatically makes every file inside /api a serverless function.
-// It receives all /api/* requests and forwards them to the Express app.
+import express from "express";
 
-import app from '../backend/index.js';
+const app = express();
 
-export default app;
+app.use(express.json());
+
+app.get("/api/hello", (req, res) => {
+    res.json({
+        message: "Hello from Express backend!"
+    });
+});
+
+module.exports = app;
