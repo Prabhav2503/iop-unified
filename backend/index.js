@@ -1,5 +1,4 @@
 import express from "express";
-import cors from "cors";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 
@@ -18,23 +17,6 @@ import taskrouter from "./src/routes/initiative/tasks.js";
 import databasrouter from "./src/routes/database.js";
 
 const app = express();
-
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:8080",
-  "https://iop-edciitd.web.app",
-  "https://iop-frontend.vercel.app",
-];
-
-app.use(
-  cors({
-    origin: true,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  })
-);
-
-app.options("*", cors());
   
 
 app.use(cookieParser());
