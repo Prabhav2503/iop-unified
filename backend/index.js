@@ -57,10 +57,10 @@ app.get("/api/health", (req, res) => {
 
 // uncomment the following lines if you want to run the server directly from this file
 
-const port = process.env.PORT || 5000;
+// const port = process.env.PORT || 5000;
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
+// app.listen(port, () => {
+//   console.log(`Server is running on port ${port}`);
+// });
 
 export default app;
