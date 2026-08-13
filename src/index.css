@@ -1,0 +1,98 @@
+/* Self-hosted fonts (latin subset only) — no CDN dependency, no flash of
+   unstyled text on slow campus networks.
+   Poppins = headings / display, Inter = UI + body. */
+@import '@fontsource/poppins/latin-500.css';
+@import '@fontsource/poppins/latin-600.css';
+@import '@fontsource/inter/latin-400.css';
+@import '@fontsource/inter/latin-500.css';
+@import '@fontsource/inter/latin-600.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Makes native controls — date pickers, selects, scrollbars — render dark
+       instead of light-on-dark. Without this the date inputs stay white. */
+    color-scheme: dark;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    @apply bg-canvas;
+  }
+
+  /* Body weight is 500, not 400. Light text on a dark canvas haloes and reads
+     thinner than it measures, so 500 here is the perceptual equivalent of a
+     normal weight on light. Headings stay at 600, so the hierarchy holds. */
+  body {
+    @apply bg-canvas font-sans text-body font-medium text-ink antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    font-variant-ligatures: contextual;
+  }
+
+  ::selection {
+    @apply bg-accent-500 text-white;
+  }
+
+  /* ── Reduced motion ──────────────────────────────────────────────────────
+     One blanket rule rather than per-component opt-ins, so motion added later
+     is covered automatically and cannot be forgotten. Durations go to ~0
+     instead of `none` because a zero-length animation still fires its events
+     and still applies its end state — so elements that animate in from
+     opacity 0 land visible rather than staying invisible. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-delay: 0ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      transition-delay: 0ms !important;
+      scroll-behavior: auto !important;
+    }
+
+    /* The single exception, and a deliberate one: a loading spinner is not a
+       state transition, it is the only signal that work is still happening.
+       Frozen on its first frame it reads as a hung app. Slowed right down
+       instead of stopped. */
+    .animate-spin {
+      animation-duration: 1.6s !important;
+      animation-iteration-count: infinite !important;
+    }
+  }
+}
+
+@layer components {
+  /* Staggered entrance for a list or card grid. Applied to the container; each
+     direct child rises in just behind the one before it.
+     The delay is capped at the 6th child — past that everything shares the
+     last step, so a 40-row list still finishes in under a quarter of a second
+     and nothing ever waits on the animation to become readable. */
+  /* @apply rather than a hand-written `animation` shorthand: it keeps the
+     timing in tailwind.config.js as the single source, and guarantees the
+     @keyframes block is emitted even if no JSX uses the utility directly. */
+  .stagger-in > * {
+    @apply animate-rise-in;
+  }
+  .stagger-in > *:nth-child(1) {
+    animation-delay: 0ms;
+  }
+  .stagger-in > *:nth-child(2) {
+    animation-delay: 30ms;
+  }
+  .stagger-in > *:nth-child(3) {
+    animation-delay: 60ms;
+  }
+  .stagger-in > *:nth-child(4) {
+    animation-delay: 90ms;
+  }
+  .stagger-in > *:nth-child(5) {
+    animation-delay: 120ms;
+  }
+  .stagger-in > *:nth-child(n + 6) {
+    animation-delay: 150ms;
+  }
+}
