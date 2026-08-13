@@ -1,13 +1,3 @@
-import express from "express";
-
-const app = express();
-
-app.use(express.json());
-
-app.get("/api/hello", (req, res) => {
-    res.json({
-        message: "Hello from Express backend!"
-    });
-});
+import app from "../backend/index.js";
 
 export default app;
