@@ -5,17 +5,17 @@ import cookieParser from "cookie-parser";
 
 dotenv.config();
 
-import authrouter from "./src/routes/authroutes.js";
-import middleware from "./src/middleware/authcontext.js";
-import teamrouter from "./src/routes/teamroutes.js";
-import contactrouter from "./src/routes/contactroutes.js";
-import startuprouter from "./src/routes/startup/startuproutes.js";
-import updaterouter from "./src/routes/startup/updateroutes.js";
-import initiativerouter from "./src/routes/initiative/initiatives.js";
-import initiativeteamrouter from "./src/routes/initiative/initiative_teams.js";
-import stagerouter from "./src/routes/initiative/stages.js";
-import taskrouter from "./src/routes/initiative/tasks.js";
-import databasrouter from "./src/routes/database.js";
+// import authrouter from "./src/routes/authroutes.js";
+// import middleware from "./src/middleware/authcontext.js";
+// import teamrouter from "./src/routes/teamroutes.js";
+// import contactrouter from "./src/routes/contactroutes.js";
+// import startuprouter from "./src/routes/startup/startuproutes.js";
+// import updaterouter from "./src/routes/startup/updateroutes.js";
+// import initiativerouter from "./src/routes/initiative/initiatives.js";
+// import initiativeteamrouter from "./src/routes/initiative/initiative_teams.js";
+// import stagerouter from "./src/routes/initiative/stages.js";
+// import taskrouter from "./src/routes/initiative/tasks.js";
+// import databasrouter from "./src/routes/database.js";
 
 const app = express();
 
@@ -40,16 +40,16 @@ app.options("*", cors());
 app.use(cookieParser());
 app.use(express.json());
 
-app.use("/api", authrouter);
-app.use("/api/teams", middleware, teamrouter);
-app.use("/api/contacts", middleware, contactrouter);
-app.use("/api/startups", middleware, startuprouter);
-app.use("/api/updates", middleware, updaterouter);
-app.use("/api/initiatives", middleware, initiativerouter);
-app.use("/api/initiative-teams", middleware, initiativeteamrouter);
-app.use("/api/stages", middleware, stagerouter);
-app.use("/api/tasks", middleware, taskrouter);
-app.use("/api/databases", middleware, databasrouter);
+// app.use("/api", authrouter);
+// app.use("/api/teams", middleware, teamrouter);
+// app.use("/api/contacts", middleware, contactrouter);
+// app.use("/api/startups", middleware, startuprouter);
+// app.use("/api/updates", middleware, updaterouter);
+// app.use("/api/initiatives", middleware, initiativerouter);
+// app.use("/api/initiative-teams", middleware, initiativeteamrouter);
+// app.use("/api/stages", middleware, stagerouter);
+// app.use("/api/tasks", middleware, taskrouter);
+// app.use("/api/databases", middleware, databasrouter);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({ message: "Server is healthy" });
