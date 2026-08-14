@@ -1,52 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Briefcase, Calendar, Layers, Rocket } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Briefcase, Calendar, Layers, Rocket, CheckSquare, Sparkles } from 'lucide-react';
+import { getTeamMemberById } from '../API/team';
+import { getAllInitiatives } from '../API/initiative';
 import { FOCUS, Chip, IconChip, ErrorPanel, LoadingPanel } from './ui';
-
-// ====================== MOCK DETAIL DATA ======================
-// NOTE: `getTeamMemberById` already exists in ../API/team — this page has simply
-// never been wired to it, so any real member id falls through to "not found".
-// Swapping the lookup below for that call is a data-fetching change, so it is
-// deliberately left alone here and flagged instead.
-const MOCK_MEMBER_DETAILS = {
-  'f6be3adc-8f82-4a27-86e7-86beb20ad658': {
-    id: 'f6be3adc-8f82-4a27-86e7-86beb20ad658',
-    created_at: '2026-07-13T13:38:09.963404+00:00',
-    name: 'exe',
-    role: ['executive'],
-    email: 'abc@gmail.com',
-    number: '1234567890',
-    initiative: null,
-    tasks: null,
-    contribution: null,
-    vertical: 'Technical',
-  },
-  '61367b2d-878a-45ce-9442-5b75e21f081d': {
-    id: '61367b2d-878a-45ce-9442-5b75e21f081d',
-    created_at: '2026-07-14T10:20:00.000Z',
-    name: 'abc',
-    role: ['executive'],
-    email: 'abc@gmail.com',
-    number: '9876543210',
-    initiative: null,
-    tasks: null,
-    contribution: null,
-    vertical: 'Technical',
-  },
-  '9fe69163-e697-490f-9182-d9ce0aaa0f23': {
-    id: '9fe69163-e697-490f-9182-d9ce0aaa0f23',
-    created_at: '2026-07-10T08:15:00.000Z',
-    name: 'prabhav',
-    role: ['admin'],
-    email: 'prabhav589@gmail.com',
-    number: '9998887776',
-    initiative: null,
-    tasks: null,
-    contribution: null,
-    vertical: 'Technical',
-  },
-};
-// ==============================================================
 
 function getRoleDisplay(role) {
   const roleStr = Array.isArray(role) ? role[0] || '' : role || '';
@@ -112,35 +69,63 @@ export default function TeamMemberDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [member, setMember] = useState(null);
+  const [initiativesMap, setInitiativesMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchMember = async () => {
       setLoading(true);
       setError('');
       try {
-        // ===== Replace with real API later =====
-        // const res = await getTeamMemberById(id);
-        await new Promise((r) => setTimeout(r, 300));
-        const data = MOCK_MEMBER_DETAILS[id];
+        const [memberRes, initRes] = await Promise.allSettled([
+          getTeamMemberById(id),
+          getAllInitiatives(),
+        ]);
 
-        if (!data) {
-          setError('Member not found');
-          setMember(null);
-        } else {
-          setMember(data);
+        if (!isMounted) return;
+
+        if (initRes.status === 'fulfilled' && initRes.value?.data) {
+          const map = {};
+          for (const init of initRes.value.data) {
+            if (init.id) map[init.id] = init.name;
+          }
+          setInitiativesMap(map);
         }
-        // =======================================
+
+        if (memberRes.status === 'fulfilled') {
+          const res = memberRes.value;
+          if (res.error) {
+            setError(res.error);
+            setMember(null);
+          } else if (res.data) {
+            setMember(res.data);
+          } else {
+            setError('Member not found');
+            setMember(null);
+          }
+        } else {
+          setError('Failed to load member details');
+        }
       } catch (err) {
-        console.error(err);
-        setError('Failed to load member details');
+        if (isMounted) {
+          console.error(err);
+          setError('Failed to load member details');
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     if (id) fetchMember();
+
+    return () => {
+      isMounted = false;
+    };
   }, [id]);
 
   const backLink = (
@@ -171,7 +156,7 @@ export default function TeamMemberDetail() {
     );
   }
 
-  const initiatives = toList(member.initiative);
+  const initiatives = toList(member.initiative).map((item) => initiativesMap[item] || item);
   const tasks = toList(member.tasks);
   const contributions = toList(member.contribution);
   const hasActivity = initiatives.length || tasks.length || contributions.length;

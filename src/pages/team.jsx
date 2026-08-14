@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import { Plus, Trash2, Loader2, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getAllTeamMembers, deleteTeamMember } from '../API/team';
 import AddMemberModal from '../components/AddMemberModal';
+import TeamMemberDetailModal from '../components/TeamMemberDetailModal';
 import {
   getActiveVerticals,
   getVerticalOptions,
@@ -72,6 +72,7 @@ export default function Team() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedMember, setSelectedMember] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [search, setSearch] = useState('');
   const [verticalFilter, setVerticalFilter] = useState('all');
@@ -138,14 +139,15 @@ export default function Team() {
     const isDeleting = deletingId === member.id;
     return (
       <li key={member.id || member.email} className="flex items-center gap-3 px-4 py-2.5">
-        <Link
-          to={`/team/${member.id}`}
-          className={`flex min-w-0 flex-1 items-center gap-3 rounded-control ${FOCUS}`}
+        <button
+          type="button"
+          onClick={() => setSelectedMember(member)}
+          className={`group flex min-w-0 flex-1 items-center gap-3 rounded-control text-left transition-colors duration-150 hover:opacity-95 ${FOCUS}`}
         >
           <Avatar name={member.name} />
 
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-body font-medium text-ink">
+            <span className="block truncate text-body font-medium text-ink group-hover:text-accent-300 transition-colors">
               {member.name || 'Unnamed member'}
             </span>
             <span className="mt-0.5 block truncate text-meta text-ink-faint">
@@ -155,8 +157,8 @@ export default function Team() {
 
           <Chip tone={roleTone(member.role)}>{getRoleDisplay(member.role)}</Chip>
 
-          <ChevronRight className="h-4 w-4 shrink-0 text-ink-faint" aria-hidden="true" />
-        </Link>
+          <ChevronRight className="h-4 w-4 shrink-0 text-ink-faint group-hover:text-ink transition-colors" aria-hidden="true" />
+        </button>
 
         {privileged && (
           <IconButton
@@ -200,6 +202,14 @@ export default function Team() {
         <AddMemberModal
           onClose={() => setShowAddModal(false)}
           onSuccess={handleMemberAdded}
+        />
+      )}
+
+      {selectedMember && (
+        <TeamMemberDetailModal
+          memberId={selectedMember.id}
+          initialMember={selectedMember}
+          onClose={() => setSelectedMember(null)}
         />
       )}
 
