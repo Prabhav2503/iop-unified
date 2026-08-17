@@ -49,7 +49,8 @@ function isPrivilegedRole(user) {
   return (
     r.includes('admin') ||
     r.includes('overall_coordinator') ||
-    r.includes('co_overall_coordinator')
+    r.includes('co_overall_coordinator') ||
+    r.includes('coordinator')
   );
 }
 
