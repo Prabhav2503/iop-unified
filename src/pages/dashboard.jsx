@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Rocket, CheckSquare, Plus, Loader2, Calendar, Clock, Key, Trash2 } from 'lucide-react';
+import { Rocket, CheckSquare, Plus, Loader2, Calendar, Clock, Key, Trash2, Pencil } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { changePassword } from '../API/auth';
 import { getAllInitiatives } from '../API/initiative';
 import { getAllTasks, createTask, deleteTask } from '../API/task';
 import { getTeamDropdown } from '../API/team';
+import EditProfileModal from '../components/EditProfileModal';
 import {
   INPUT_CLS,
   BTN_PRIMARY,
@@ -426,6 +427,7 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [showAddTask, setShowAddTask] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
 
   const fetchData = useCallback(async () => {
     setError('');
@@ -503,18 +505,34 @@ export default function Dashboard() {
         />
       )}
 
+      {showEditProfile && (
+        <EditProfileModal
+          onClose={() => setShowEditProfile(false)}
+          onSuccess={() => void fetchData()}
+        />
+      )}
+
       <div className="max-w-6xl space-y-6 px-4 py-4 sm:px-7 sm:py-7">
         <PageHeader
           title="Dashboard"
           description="Your active tasks, upcoming deadlines, and initiatives."
           action={
-            <button
-              onClick={() => setShowChangePassword(true)}
-              className={BTN_QUIET}
-            >
-              <Key className="h-3.5 w-3.5 text-ink-faint" />
-              Change password
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setShowEditProfile(true)}
+                className={BTN_QUIET}
+              >
+                <Pencil className="h-3.5 w-3.5 text-ink-faint" />
+                Edit profile
+              </button>
+              <button
+                onClick={() => setShowChangePassword(true)}
+                className={BTN_QUIET}
+              >
+                <Key className="h-3.5 w-3.5 text-ink-faint" />
+                Change password
+              </button>
+            </div>
           }
         />
 
