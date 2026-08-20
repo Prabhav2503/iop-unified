@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import {
   Plus,
   Trash2,
@@ -10,13 +10,7 @@ import {
   Phone,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import {
-  getAllContacts,
-  getVisibleContacts,
-  createContact,
-  deleteContact,
-  toggleContactVisibility,
-} from '../API/contact';
+import { useContactsForRole, useCreateContact, useDeleteContact, useToggleContactVisibility } from '../hooks/useQueries';
 import {
   INPUT_CLS,
   BTN_PRIMARY,
@@ -135,13 +129,13 @@ const EMPTY_CONTACT_FORM = {
 
 function AddContactModal({ onClose, onSuccess }) {
   const [form, setForm] = useState(EMPTY_CONTACT_FORM);
-  const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const createContactMutation = useCreateContact();
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   const setArr = (field) => (val) => setForm((f) => ({ ...f, [field]: val }));
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     setFormError('');
 
@@ -150,8 +144,7 @@ function AddContactModal({ onClose, onSuccess }) {
       return;
     }
 
-    setSubmitting(true);
-    const result = await createContact({
+    createContactMutation.mutate({
       name: form.name.trim(),
       number: form.number.trim() || null,
       email: form.email.trim() || null,
@@ -159,14 +152,10 @@ function AddContactModal({ onClose, onSuccess }) {
       roles: form.roles.length > 0 ? form.roles : null,
       tags: form.tags.length > 0 ? form.tags : null,
       dataset_id: form.dataset_id.trim() || null,
+    }, {
+      onSuccess: (res) => onSuccess(res?.data),
+      onError: (err) => setFormError(err.message || 'Failed to create contact'),
     });
-    setSubmitting(false);
-
-    if (result.error) {
-      setFormError(result.error);
-    } else {
-      onSuccess(result.data);
-    }
   };
 
   return (
@@ -177,9 +166,9 @@ function AddContactModal({ onClose, onSuccess }) {
       footer={
         <>
           <CancelButton onClose={onClose} />
-          <button type="submit" disabled={submitting} className={BTN_PRIMARY}>
-            {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            {submitting ? 'Saving...' : 'Save contact'}
+          <button type="submit" disabled={createContactMutation.isPending} className={BTN_PRIMARY}>
+            {createContactMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {createContactMutation.isPending ? 'Saving...' : 'Save contact'}
           </button>
         </>
       }
@@ -260,9 +249,12 @@ export default function ContactsPage() {
   const { user } = useAuth();
   const privileged = isPrivilegedContactRole(user);
 
-  const [contacts, setContacts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { data: contacts = [], isLoading: loading, error: queryError } = useContactsForRole(privileged);
+  const deleteContactMutation = useDeleteContact();
+  const toggleVisibilityMutation = useToggleContactVisibility();
+
+  const error = queryError?.message || '';
+
   const [search, setSearch] = useState('');
   const [visibilityFilter, setVisibilityFilter] = useState('all');
 
@@ -272,76 +264,28 @@ export default function ContactsPage() {
   const [togglingId, setTogglingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
 
-  const fetchContacts = useCallback(async () => {
-    setError('');
-    setLoading(true);
-    try {
-      // Privileged role (admin, oc, co-oc, coordinator) fetches ALL contacts
-      // Non-privileged (executives) fetches ONLY visible contacts via getVisibleContacts
-      const result = privileged ? await getAllContacts() : await getVisibleContacts();
-
-      if (result.error) {
-        setError(result.error);
-        setContacts([]);
-      } else {
-        setContacts(result.data || []);
-      }
-    } catch {
-      setError('Unexpected error loading contacts');
-      setContacts([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [privileged]);
-
-  useEffect(() => {
-    void fetchContacts();
-  }, [fetchContacts]);
-
-  const handleContactAdded = (newContact) => {
+  const handleContactAdded = () => {
     setShowAddModal(false);
-    if (newContact) {
-      setContacts((prev) => [newContact, ...prev]);
-    }
   };
 
   const handleToggleVisibility = async (contactId) => {
     setTogglingId(contactId);
-
-    // Optimistically update UI
-    setContacts((prev) =>
-      prev.map((c) => (c.id === contactId ? { ...c, visibility: !c.visibility } : c))
+    toggleVisibilityMutation.mutate(
+      { id: contactId },
+      {
+        onSettled: () => setTogglingId(null),
+        onError: (err) => alert(`Failed to toggle visibility: ${err.message}`),
+      }
     );
-
-    const result = await toggleContactVisibility(contactId);
-    setTogglingId(null);
-
-    if (result.error) {
-      // Revert optimism if error
-      setContacts((prev) =>
-        prev.map((c) => (c.id === contactId ? { ...c, visibility: !c.visibility } : c))
-      );
-      alert(`Failed to toggle visibility: ${result.error}`);
-    } else if (result.data) {
-      // Ensure backend data state is synced
-      setContacts((prev) =>
-        prev.map((c) => (c.id === contactId ? { ...c, visibility: result.data.visibility } : c))
-      );
-    }
   };
 
   const handleDelete = async (contactId) => {
     if (!window.confirm('Delete this contact? This action cannot be undone.')) return;
-
     setDeletingId(contactId);
-    const result = await deleteContact(contactId);
-    setDeletingId(null);
-
-    if (result.error) {
-      alert(`Delete failed: ${result.error}`);
-    } else {
-      setContacts((prev) => prev.filter((c) => c.id !== contactId));
-    }
+    deleteContactMutation.mutate(contactId, {
+      onSettled: () => setDeletingId(null),
+      onError: (err) => alert(`Delete failed: ${err.message}`),
+    });
   };
 
   // Search filter

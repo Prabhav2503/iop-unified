@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { Plus, Trash2, Loader2, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { getAllTeamMembers, deleteTeamMember } from '../API/team';
+import { useTeamMembers, useDeleteTeamMember } from '../hooks/useQueries';
 import AddMemberModal from '../components/AddMemberModal';
 import TeamMemberDetailModal from '../components/TeamMemberDetailModal';
 import {
@@ -69,9 +69,11 @@ export default function Team() {
   const { user } = useAuth();
   const privileged = isPrivilegedRole(user);
 
-  const [teamMembers, setTeamMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { data: teamMembers = [], isLoading: loading, error: queryError } = useTeamMembers();
+  const deleteTeamMemberMutation = useDeleteTeamMember();
+
+  const error = queryError?.message || '';
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
@@ -81,45 +83,17 @@ export default function Team() {
   // Replays the roster's load-in on every vertical pill click.
   const [listReplayKey, replayList] = useFilterReplay();
 
-  const fetchTeam = useCallback(async () => {
-    setError('');
-    try {
-      const result = await getAllTeamMembers();
-      if (result.error) {
-        setError(result.error);
-        setTeamMembers([]);
-      } else {
-        setTeamMembers(result.data || []);
-      }
-    } catch {
-      setError('Unexpected error loading team');
-      setTeamMembers([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void fetchTeam();
-  }, [fetchTeam]);
-
-  const handleMemberAdded = (newMember) => {
+  const handleMemberAdded = () => {
     setShowAddModal(false);
-    if (newMember) {
-      setTeamMembers((prev) => [newMember, ...prev]);
-    }
   };
 
   const handleDelete = async (memberId) => {
     if (!window.confirm('Remove this team member? This cannot be undone.')) return;
     setDeletingId(memberId);
-    const result = await deleteTeamMember(memberId);
-    setDeletingId(null);
-    if (result.error) {
-      alert(`Delete failed: ${result.error}`);
-    } else {
-      setTeamMembers((prev) => prev.filter((m) => m.id !== memberId));
-    }
+    deleteTeamMemberMutation.mutate(memberId, {
+      onSettled: () => setDeletingId(null),
+      onError: (err) => alert(`Delete failed: ${err.message}`),
+    });
   };
 
   // Derive unique verticals from actual API data (sorted for stable ordering, excluding 'All')

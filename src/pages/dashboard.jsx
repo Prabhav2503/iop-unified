@@ -1,10 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { Rocket, CheckSquare, Plus, Loader2, Calendar, Clock, Key, Trash2, Pencil } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { changePassword } from '../API/auth';
-import { getAllInitiatives } from '../API/initiative';
-import { getAllTasks, createTask, deleteTask } from '../API/task';
-import { getTeamDropdown } from '../API/team';
+import { useInitiatives, useTasks, useTeamDropdown, useCreateTask, useDeleteTask } from '../hooks/useQueries';
 import EditProfileModal from '../components/EditProfileModal';
 import {
   INPUT_CLS,
@@ -162,25 +160,15 @@ function AddDashboardTaskModal({ onClose, onSuccess }) {
   const [deadline, setDeadline] = useState('');
   const [comment, setComment] = useState('');
   const [selectedAssignees, setSelectedAssignees] = useState([]);
-
-  const [teamOptions, setTeamOptions] = useState([]);
-  const [teamsLoading, setTeamsLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    getTeamDropdown().then((res) => {
-      setTeamOptions(res.data || []);
-      setTeamsLoading(false);
-    });
-  }, []);
+  const { data: teamOptions = [], isLoading: teamsLoading } = useTeamDropdown();
+  const createTaskMutation = useCreateTask();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!title.trim()) return;
-
     setError('');
-    setSubmitting(true);
 
     const taskPayload = {
       title: title.trim(),
@@ -194,14 +182,10 @@ function AddDashboardTaskModal({ onClose, onSuccess }) {
       assignees: selectedAssignees,
     };
 
-    const res = await createTask(taskPayload);
-    setSubmitting(false);
-
-    if (res.error) {
-      setError(res.error);
-    } else {
-      onSuccess({ id: res.task_id, ...taskPayload });
-    }
+    createTaskMutation.mutate(taskPayload, {
+      onSuccess: (res) => onSuccess({ id: res?.task_id, ...taskPayload }),
+      onError: (err) => setError(err.message || 'Failed to create task'),
+    });
   };
 
   const assigneeDropdownOptions = [
@@ -227,8 +211,8 @@ function AddDashboardTaskModal({ onClose, onSuccess }) {
       footer={
         <>
           <CancelButton onClose={onClose} />
-          <button type="submit" disabled={submitting} className={BTN_PRIMARY}>
-            {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          <button type="submit" disabled={createTaskMutation.isPending} className={BTN_PRIMARY}>
+            {createTaskMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             Create task
           </button>
         </>
@@ -421,45 +405,22 @@ function ChangePasswordModal({ onClose }) {
 export default function Dashboard() {
   const { user } = useAuth();
 
-  const [initiatives, setInitiatives] = useState([]);
-  const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [showAddTask, setShowAddTask] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
 
-  const fetchData = useCallback(async () => {
-    setError('');
-    setLoading(true);
-    try {
-      const [initRes, tasksRes] = await Promise.all([
-        getAllInitiatives(),
-        getAllTasks(),
-      ]);
+  const { data: initiatives = [], isLoading: initLoading, error: initError } = useInitiatives();
+  const { data: tasks = [], isLoading: tasksLoading, error: tasksError } = useTasks();
+  const deleteTaskMutation = useDeleteTask();
 
-      if (initRes.error) setError(initRes.error);
-      setInitiatives(initRes.data || []);
-      setTasks(tasksRes.data || []);
-    } catch {
-      setError('Failed to load dashboard data');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void fetchData();
-  }, [fetchData]);
+  const loading = initLoading || tasksLoading;
+  const error = initError?.message || tasksError?.message || '';
 
   const handleDeleteTask = async (taskId) => {
     if (!window.confirm('Delete this task?')) return;
-    const res = await deleteTask(taskId);
-    if (res.error) {
-      alert(res.error);
-    } else {
-      setTasks((prev) => prev.filter((t) => t.id !== taskId));
-    }
+    deleteTaskMutation.mutate(taskId, {
+      onError: (err) => alert(err.message || 'Failed to delete task'),
+    });
   };
 
   // 1. Total Initiative Count
@@ -492,10 +453,7 @@ export default function Dashboard() {
       {showAddTask && (
         <AddDashboardTaskModal
           onClose={() => setShowAddTask(false)}
-          onSuccess={(newTask) => {
-            setShowAddTask(false);
-            if (newTask) setTasks((prev) => [newTask, ...prev]);
-          }}
+          onSuccess={() => setShowAddTask(false)}
         />
       )}
 
@@ -508,7 +466,7 @@ export default function Dashboard() {
       {showEditProfile && (
         <EditProfileModal
           onClose={() => setShowEditProfile(false)}
-          onSuccess={() => void fetchData()}
+          onSuccess={() => setShowEditProfile(false)}
         />
       )}
 

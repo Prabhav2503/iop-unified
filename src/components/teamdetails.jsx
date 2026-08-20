@@ -1,8 +1,6 @@
-import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Briefcase, Calendar, Layers, Rocket, CheckSquare, Sparkles } from 'lucide-react';
-import { getTeamMemberById } from '../API/team';
-import { getAllInitiatives } from '../API/initiative';
+import { ArrowLeft, Mail, Phone, Briefcase, Calendar, Layers, Rocket } from 'lucide-react';
+import { useTeamMemberById, useInitiatives } from '../hooks/useQueries';
 import { FOCUS, Chip, IconChip, ErrorPanel, LoadingPanel } from './ui';
 
 function getRoleDisplay(role) {
@@ -68,65 +66,18 @@ function DetailRow({ icon, label, value }) {
 export default function TeamMemberDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [member, setMember] = useState(null);
-  const [initiativesMap, setInitiativesMap] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
-  useEffect(() => {
-    let isMounted = true;
+  const { data: member, isLoading: memberLoading, error: memberError } = useTeamMemberById(id);
+  const { data: allInitiatives = [] } = useInitiatives();
 
-    const fetchMember = async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const [memberRes, initRes] = await Promise.allSettled([
-          getTeamMemberById(id),
-          getAllInitiatives(),
-        ]);
+  const loading = memberLoading;
+  const error = memberError?.message || '';
 
-        if (!isMounted) return;
-
-        if (initRes.status === 'fulfilled' && initRes.value?.data) {
-          const map = {};
-          for (const init of initRes.value.data) {
-            if (init.id) map[init.id] = init.name;
-          }
-          setInitiativesMap(map);
-        }
-
-        if (memberRes.status === 'fulfilled') {
-          const res = memberRes.value;
-          if (res.error) {
-            setError(res.error);
-            setMember(null);
-          } else if (res.data) {
-            setMember(res.data);
-          } else {
-            setError('Member not found');
-            setMember(null);
-          }
-        } else {
-          setError('Failed to load member details');
-        }
-      } catch (err) {
-        if (isMounted) {
-          console.error(err);
-          setError('Failed to load member details');
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    if (id) fetchMember();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [id]);
+  // Build id→name map from cached initiatives
+  const initiativesMap = {};
+  for (const init of allInitiatives) {
+    if (init.id) initiativesMap[init.id] = init.name;
+  }
 
   const backLink = (
     <button

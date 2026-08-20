@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import {
   Plus,
   Trash2,
@@ -11,12 +11,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import {
-  getAllDatabaseRecords,
-  createDatabaseRecord,
-  updateDatabaseRecord,
-  deleteDatabaseRecord,
-} from '../API/database';
+import { useDatabaseRecords, useCreateDatabaseRecord, useUpdateDatabaseRecord, useDeleteDatabaseRecord } from '../hooks/useQueries';
 import {
   FOCUS,
   INPUT_CLS,
@@ -91,43 +86,31 @@ function DriveRecordModal({ initialRecord, onClose, onSuccess }) {
   const [driveUrl, setDriveUrl] = useState(initialRecord?.drive_url || '');
   const [name, setname] = useState('');
   const [description, setDescription] = useState('');
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const isEditing = Boolean(initialRecord);
+  const createMutation = useCreateDatabaseRecord();
+  const updateMutation = useUpdateDatabaseRecord();
+  const isPending = createMutation.isPending || updateMutation.isPending;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!driveUrl.trim()) return;
 
     setError('');
-    setSubmitting(true);
 
     const creatorUuid = user?.profile_id || user?.id || user?.user_id || user?.team_id || null;
 
-    let res;
     if (isEditing) {
-      res = await updateDatabaseRecord(initialRecord.id, {
-        drive_url: driveUrl.trim(),
-        created_by: creatorUuid,
-        name: name,
-        description: description,
-      });
+      updateMutation.mutate(
+        { id: initialRecord.id, updates: { drive_url: driveUrl.trim(), created_by: creatorUuid, name, description } },
+        { onSuccess: (res) => onSuccess(res?.data), onError: (err) => setError(err.message) }
+      );
     } else {
-      res = await createDatabaseRecord({
-        drive_url: driveUrl.trim(),
-        name: name,
-        description: description,
-        created_by: creatorUuid,
-      });
-    }
-
-    setSubmitting(false);
-
-    if (res.error) {
-      setError(res.error);
-    } else {
-      onSuccess(res.data);
+      createMutation.mutate(
+        { drive_url: driveUrl.trim(), name, description, created_by: creatorUuid },
+        { onSuccess: (res) => onSuccess(res?.data), onError: (err) => setError(err.message) }
+      );
     }
   };
 
@@ -140,8 +123,8 @@ function DriveRecordModal({ initialRecord, onClose, onSuccess }) {
       footer={
         <>
           <CancelButton onClose={onClose} />
-          <button type="submit" disabled={submitting} className={BTN_PRIMARY}>
-            {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          <button type="submit" disabled={isPending} className={BTN_PRIMARY}>
+            {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {isEditing ? 'Save changes' : 'Add link'}
           </button>
         </>
@@ -193,46 +176,24 @@ export default function DatabasePage() {
   const { user } = useAuth();
   const privileged = isPrivilegedRole(user);
 
-  const [records, setRecords] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
+  const { data: records = [], isLoading: loading, error: queryError } = useDatabaseRecords();
+  const deleteRecordMutation = useDeleteDatabaseRecord();
 
+  const error = queryError?.message || '';
+
+  const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
 
-  const fetchData = useCallback(async () => {
-    setError('');
-    setLoading(true);
-    try {
-      const res = await getAllDatabaseRecords();
-      if (res.error) setError(res.error);
-      setRecords(res.data || []);
-    } catch {
-      setError('Failed to fetch database records');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void fetchData();
-  }, [fetchData]);
-
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this drive record?')) return;
-
     setDeletingId(id);
-    const res = await deleteDatabaseRecord(id);
-    setDeletingId(null);
-
-    if (res.error) {
-      alert(`Delete failed: ${res.error}`);
-    } else {
-      setRecords((prev) => prev.filter((r) => r.id !== id));
-    }
+    deleteRecordMutation.mutate(id, {
+      onSettled: () => setDeletingId(null),
+      onError: (err) => alert(`Delete failed: ${err.message}`),
+    });
   };
 
   const handleCopyLink = (id, url) => {
@@ -263,7 +224,6 @@ export default function DatabasePage() {
           onSuccess={() => {
             setShowAddModal(false);
             setEditingRecord(null);
-            void fetchData();
           }}
         />
       )}

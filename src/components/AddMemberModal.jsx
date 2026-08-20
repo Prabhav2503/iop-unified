@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { registerTeamMember } from '../API/team';
-import { getActiveInitiatives } from '../API/initiative';
+import { useInitiatives, KEYS } from '../hooks/useQueries';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   INPUT_CLS,
   BTN_PRIMARY,
@@ -121,16 +122,14 @@ export default function AddMemberModal({ onClose, onSuccess }) {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
-  // Active initiatives for the dropdown
-  const [initiatives, setInitiatives] = useState([]);
-  const [initiativesLoading, setInitiativesLoading] = useState(true);
+  // Active initiatives from cache — already populated when visiting Team page
+  const { data: allInitiatives = [], isLoading: initiativesLoading } = useInitiatives();
+  const initiatives = allInitiatives.filter((i) => {
+    const s = (i.status || '').toLowerCase();
+    return s === 'active' || s === 'planning' || s === '';
+  });
 
-  useEffect(() => {
-    getActiveInitiatives().then((result) => {
-      setInitiatives(result.data || []);
-      setInitiativesLoading(false);
-    });
-  }, []);
+  const qc = useQueryClient();
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   const setVal = (field) => (val) => setForm((f) => ({ ...f, [field]: val }));
@@ -160,6 +159,9 @@ export default function AddMemberModal({ onClose, onSuccess }) {
     if (result.error) {
       setFormError(result.error);
     } else {
+      // Invalidate team cache so the roster refreshes
+      qc.invalidateQueries({ queryKey: KEYS.team });
+      qc.invalidateQueries({ queryKey: KEYS.teamDropdown });
       onSuccess(result.data);
     }
   };

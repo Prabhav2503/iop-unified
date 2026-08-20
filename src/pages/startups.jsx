@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Building2,
   Plus,
@@ -14,14 +14,8 @@ import {
   Calendar,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import {
-  getAllStartups,
-  getStartupById,
-  createStartup,
-  deleteStartup,
-} from '../API/startup';
-import { getAllContacts } from '../API/contact';
-import { getAllInitiatives } from '../API/initiative';
+import { getStartupById } from '../API/startup';
+import { useStartups, useContacts, useInitiatives, useDeleteStartup, useCreateStartup } from '../hooks/useQueries';
 import {
   FOCUS,
   INPUT_CLS,
@@ -114,15 +108,14 @@ function AddStartupModal({ contacts, initiatives, onClose, onSuccess }) {
   const [initiativeId, setInitiativeId] = useState('');
   const [supportType, setSupportType] = useState('');
 
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const createStartupMutation = useCreateStartup();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim() || !description.trim() || !edcImpact.trim()) return;
 
     setError('');
-    setSubmitting(true);
 
     const payload = {
       name: name.trim(),
@@ -141,14 +134,10 @@ function AddStartupModal({ contacts, initiatives, onClose, onSuccess }) {
       support_type: supportType.trim() || null,
     };
 
-    const res = await createStartup(payload);
-    setSubmitting(false);
-
-    if (res.error) {
-      setError(res.error);
-    } else {
-      onSuccess(res.data);
-    }
+    createStartupMutation.mutate(payload, {
+      onSuccess: (res) => onSuccess(res?.data),
+      onError: (err) => setError(err.message || 'Failed to create startup'),
+    });
   };
 
   const founderOptions = [
@@ -173,9 +162,9 @@ function AddStartupModal({ contacts, initiatives, onClose, onSuccess }) {
       footer={
         <>
           <CancelButton onClose={onClose} />
-          <button type="submit" disabled={submitting} className={BTN_PRIMARY}>
-            {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            {submitting ? 'Creating...' : 'Add startup'}
+          <button type="submit" disabled={createStartupMutation.isPending} className={BTN_PRIMARY}>
+            {createStartupMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {createStartupMutation.isPending ? 'Creating...' : 'Add startup'}
           </button>
         </>
       }
@@ -440,11 +429,13 @@ export default function StartupsPage() {
   const { user } = useAuth();
   const privileged = isPrivilegedRole(user);
 
-  const [startups, setStartups] = useState([]);
-  const [contacts, setContacts] = useState([]);
-  const [initiatives, setInitiatives] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { data: startups = [], isLoading: startupsLoading, error: startupsError } = useStartups();
+  const { data: contacts = [] } = useContacts();
+  const { data: initiatives = [] } = useInitiatives();
+  const deleteStartupMutation = useDeleteStartup();
+
+  const loading = startupsLoading;
+  const error = startupsError?.message || '';
 
   const [search, setSearch] = useState('');
   const [sectorFilter, setSectorFilter] = useState('all');
@@ -457,44 +448,15 @@ export default function StartupsPage() {
   const [viewingStartupId, setViewingStartupId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
 
-  const fetchData = useCallback(async () => {
-    setError('');
-    setLoading(true);
-    try {
-      const [startupsRes, contactsRes, initRes] = await Promise.all([
-        getAllStartups(),
-        getAllContacts(),
-        getAllInitiatives(),
-      ]);
-
-      if (startupsRes.error) setError(startupsRes.error);
-      setStartups(startupsRes.data || []);
-      setContacts(contactsRes.data || []);
-      setInitiatives(initRes.data || []);
-    } catch {
-      setError('Failed to fetch startups portfolio');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void fetchData();
-  }, [fetchData]);
-
   const handleDelete = async (e, id) => {
     e.stopPropagation();
     if (!window.confirm('Delete this startup profile?')) return;
 
     setDeletingId(id);
-    const res = await deleteStartup(id);
-    setDeletingId(null);
-
-    if (res.error) {
-      alert(`Delete failed: ${res.error}`);
-    } else {
-      setStartups((prev) => prev.filter((s) => s.id !== id));
-    }
+    deleteStartupMutation.mutate(id, {
+      onSettled: () => setDeletingId(null),
+      onError: (err) => alert(`Delete failed: ${err.message}`),
+    });
   };
 
   const filteredStartups = startups.filter((s) => {
@@ -521,12 +483,10 @@ export default function StartupsPage() {
           contacts={contacts}
           initiatives={initiatives}
           onClose={() => setShowAddModal(false)}
-          onSuccess={(created) => {
-            setShowAddModal(false);
-            if (created) setStartups((prev) => [created, ...prev]);
-          }}
+          onSuccess={() => setShowAddModal(false)}
         />
       )}
+
 
       {viewingStartupId && (
         <StartupDetailModal
