@@ -1540,19 +1540,23 @@ export default function InitiativesPage() {
 
                                     {!isPassed && (isMyCreator(tsk.creator_id, user) || privileged) && (
                                       <div className="flex shrink-0 items-center gap-0.5">
-                                        <IconButton
-                                          label="Edit task"
-                                          onClick={() => setEditingTask(tsk)}
-                                        >
-                                          <Edit2 className="h-3.5 w-3.5" />
-                                        </IconButton>
-                                        <IconButton
-                                          danger
-                                          label="Delete task"
-                                          onClick={() => handleDeleteTask(tsk.id)}
-                                        >
-                                          <Trash2 className="h-3.5 w-3.5" />
-                                        </IconButton>
+                                        {isMyCreator(tsk.creator_id, user) && (
+                                          <IconButton
+                                            label="Edit task"
+                                            onClick={() => setEditingTask(tsk)}
+                                          >
+                                            <Edit2 className="h-3.5 w-3.5" />
+                                          </IconButton>
+                                        )}
+                                        {(isMyCreator(tsk.creator_id, user) || privileged) && (
+                                          <IconButton
+                                            danger
+                                            label="Delete task"
+                                            onClick={() => handleDeleteTask(tsk.id)}
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </IconButton>
+                                        )}
                                       </div>
                                     )}
                                   </li>

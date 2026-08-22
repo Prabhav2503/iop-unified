@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Rocket, CheckSquare, Plus, Loader2, Calendar, Clock, Key, Trash2, Pencil } from 'lucide-react';
+import { Rocket, CheckSquare, Plus, Loader2, Calendar, Clock, Key, Trash2, Pencil, Edit2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { changePassword } from '../API/auth';
-import { useInitiatives, useTasks, useTeamDropdown, useCreateTask, useDeleteTask } from '../hooks/useQueries';
+import { useInitiatives, useTasks, useTeamDropdown, useCreateTask, useUpdateTask, useDeleteTask } from '../hooks/useQueries';
 import EditProfileModal from '../components/EditProfileModal';
 import {
   INPUT_CLS,
@@ -293,6 +293,154 @@ function AddDashboardTaskModal({ onClose, onSuccess }) {
   );
 }
 
+// ─── Edit Task Modal ────────────────────────────────────────────────────────
+
+function EditDashboardTaskModal({ task, onClose, onSuccess }) {
+  const [title, setTitle] = useState(task?.title || '');
+  const [priority, setPriority] = useState(task?.priority || 'medium');
+  const [status, setStatus] = useState(task?.status || 'todo');
+  const [deadline, setDeadline] = useState(
+    task?.deadline ? new Date(task.deadline).toISOString().split('T')[0] : ''
+  );
+  const [comment, setComment] = useState(task?.comment || '');
+  const initialAssignees =
+    task?.assignees ||
+    (task?.task_assignees?.map((a) => a.team_id || a.id || a).filter(Boolean)) ||
+    [];
+  const [selectedAssignees, setSelectedAssignees] = useState(initialAssignees);
+  const [error, setError] = useState('');
+
+  const { data: teamOptions = [], isLoading: teamsLoading } = useTeamDropdown();
+  const updateTaskMutation = useUpdateTask();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+    setError('');
+
+    const updates = {
+      title: title.trim(),
+      priority,
+      status,
+      deadline: deadline || null,
+      comment: comment.trim() || null,
+      assignees: selectedAssignees,
+    };
+
+    updateTaskMutation.mutate(
+      { id: task.id, updates },
+      {
+        onSuccess: () => onSuccess({ ...task, ...updates }),
+        onError: (err) => setError(err.message || 'Failed to update task'),
+      }
+    );
+  };
+
+  const assigneeDropdownOptions = [
+    { value: '', label: 'Unassigned (None)' },
+    ...teamOptions
+      .filter((t) => Boolean(t && (t.id || t.profile_id)))
+      .map((t) => {
+        const memberId = String(t.id || t.profile_id);
+        const roleDisplay = Array.isArray(t.role) ? t.role.join(', ') : t.role || 'Member';
+        return {
+          value: memberId,
+          label: `${t.name || 'Unnamed'} (${roleDisplay})`,
+        };
+      }),
+  ];
+
+  return (
+    <Modal
+      title="Edit task"
+      maxWidth="max-w-md"
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      footer={
+        <>
+          <CancelButton onClose={onClose} />
+          <button type="submit" disabled={updateTaskMutation.isPending} className={BTN_PRIMARY}>
+            {updateTaskMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            Save changes
+          </button>
+        </>
+      }
+    >
+      <Field label="Task title *">
+        <input
+          required
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="e.g. Review sponsorship deck"
+          className={INPUT_CLS}
+        />
+      </Field>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Priority">
+          <Select
+            value={priority}
+            onChange={setPriority}
+            options={PRIORITY_OPTIONS}
+            ariaLabel="Priority"
+            variant="field"
+          />
+        </Field>
+
+        <Field label="Status">
+          <Select
+            value={status}
+            onChange={setStatus}
+            options={TASK_STATUS_OPTIONS}
+            ariaLabel="Status"
+            variant="field"
+          />
+        </Field>
+      </div>
+
+      <Field label="Deadline">
+        <input
+          type="date"
+          value={deadline}
+          onChange={(e) => setDeadline(e.target.value)}
+          className={INPUT_CLS}
+        />
+      </Field>
+
+      <Field label="Comment / note">
+        <textarea
+          rows={2}
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder="Notes or details..."
+          className={INPUT_CLS}
+        />
+      </Field>
+
+      <Field label="Assign to">
+        {teamsLoading ? (
+          <div className="flex items-center gap-2 rounded-control border border-line bg-canvas px-3 py-2 text-meta text-ink-faint">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading team members...
+          </div>
+        ) : (
+          <Select
+            isMulti
+            value={selectedAssignees}
+            onChange={setSelectedAssignees}
+            options={assigneeDropdownOptions}
+            placeholder="Select assignees..."
+            ariaLabel="Assign to"
+            variant="field"
+          />
+        )}
+      </Field>
+
+      <FormError>{error}</FormError>
+    </Modal>
+  );
+}
+
 // ─── Change Password Modal ───────────────────────────────────────────────
 
 function ChangePasswordModal({ onClose }) {
@@ -406,6 +554,7 @@ export default function Dashboard() {
   const { user } = useAuth();
 
   const [showAddTask, setShowAddTask] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
 
@@ -454,6 +603,14 @@ export default function Dashboard() {
         <AddDashboardTaskModal
           onClose={() => setShowAddTask(false)}
           onSuccess={() => setShowAddTask(false)}
+        />
+      )}
+
+      {editingTask && (
+        <EditDashboardTaskModal
+          task={editingTask}
+          onClose={() => setEditingTask(null)}
+          onSuccess={() => setEditingTask(null)}
         />
       )}
 
@@ -615,13 +772,21 @@ export default function Dashboard() {
                         </div>
 
                         {isMyCreator(tsk.creator_id, user) && (
-                          <IconButton
-                            danger
-                            label="Delete task"
-                            onClick={() => handleDeleteTask(tsk.id)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </IconButton>
+                          <div className="flex shrink-0 items-center gap-0.5">
+                            <IconButton
+                              label="Edit task"
+                              onClick={() => setEditingTask(tsk)}
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                            </IconButton>
+                            <IconButton
+                              danger
+                              label="Delete task"
+                              onClick={() => handleDeleteTask(tsk.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </IconButton>
+                          </div>
                         )}
                       </li>
                     ))}
@@ -667,39 +832,59 @@ export default function Dashboard() {
               ) : (
                 <ul className="divide-y divide-line-subtle">
                   {assignedTasks.map((tsk) => (
-                    <li key={tsk.id} className="py-2.5 first:pt-0 last:pb-0">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-body font-medium text-ink">{tsk.title}</p>
-                        <span className="rounded-control bg-accent-soft px-2 py-0.5 text-micro font-medium capitalize text-accent-300">
-                          {(tsk.status || 'todo').replace('_', ' ')}
-                        </span>
+                    <li key={tsk.id} className="flex items-start justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-body font-medium text-ink">{tsk.title}</p>
+                          <span className="rounded-control bg-accent-soft px-2 py-0.5 text-micro font-medium capitalize text-accent-300">
+                            {(tsk.status || 'todo').replace('_', ' ')}
+                          </span>
+                        </div>
+
+                        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-ink-faint">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span
+                              aria-hidden="true"
+                              className={`h-1.5 w-1.5 rounded-full ${
+                                PRIORITY_DOT[tsk.priority] || PRIORITY_DOT.medium
+                              }`}
+                            />
+                            <span className="capitalize">{tsk.priority || 'medium'}</span>
+                          </span>
+                          {tsk.deadline && (
+                            <>
+                              <MetaDot />
+                              <span className="inline-flex items-center gap-1.5 tabular-nums">
+                                <Calendar className="h-3 w-3 shrink-0" aria-hidden="true" />
+                                Due {formatDate(tsk.deadline)}
+                              </span>
+                            </>
+                          )}
+                        </p>
+
+                        {tsk.comment && (
+                          <p className="mt-1.5 border-l-2 border-line pl-2.5 text-meta text-ink-faint">
+                            {tsk.comment}
+                          </p>
+                        )}
                       </div>
 
-                      <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-ink-faint">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span
-                            aria-hidden="true"
-                            className={`h-1.5 w-1.5 rounded-full ${
-                              PRIORITY_DOT[tsk.priority] || PRIORITY_DOT.medium
-                            }`}
-                          />
-                          <span className="capitalize">{tsk.priority || 'medium'}</span>
-                        </span>
-                        {tsk.deadline && (
-                          <>
-                            <MetaDot />
-                            <span className="inline-flex items-center gap-1.5 tabular-nums">
-                              <Calendar className="h-3 w-3 shrink-0" aria-hidden="true" />
-                              Due {formatDate(tsk.deadline)}
-                            </span>
-                          </>
-                        )}
-                      </p>
-
-                      {tsk.comment && (
-                        <p className="mt-1.5 border-l-2 border-line pl-2.5 text-meta text-ink-faint">
-                          {tsk.comment}
-                        </p>
+                      {isMyCreator(tsk.creator_id, user) && (
+                        <div className="flex shrink-0 items-center gap-0.5">
+                          <IconButton
+                            label="Edit task"
+                            onClick={() => setEditingTask(tsk)}
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </IconButton>
+                          <IconButton
+                            danger
+                            label="Delete task"
+                            onClick={() => handleDeleteTask(tsk.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </IconButton>
+                        </div>
                       )}
                     </li>
                   ))}

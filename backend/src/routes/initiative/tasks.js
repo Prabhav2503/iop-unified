@@ -154,7 +154,10 @@ router.patch("/:id", taskUpdateValidator, async (req, res) => {
       return res.status(status).json({ message: fetchError.message, error: fetchError });
     }
 
-    if (task.creator_id !== req.user.id) {
+    const userId = String(req.user?.profile_id || req.user?.id || req.user?.userid || '').toLowerCase().trim();
+    const creatorId = String(task.creator_id || '').toLowerCase().trim();
+
+    if (!userId || creatorId !== userId) {
       return res.status(403).json({ message: "your are not its owner" });
     }
 
@@ -213,7 +216,10 @@ router.delete("/:id", async (req, res) => {
       return res.status(status).json({ message: fetchError.message, error: fetchError });
     }
 
-    if (task.creator_id !== req.user.id) {
+    const userId = String(req.user?.profile_id || req.user?.id || req.user?.userid || '').toLowerCase().trim();
+    const creatorId = String(task.creator_id || '').toLowerCase().trim();
+
+    if (!userId || creatorId !== userId) {
       return res.status(403).json({ message: "your are not its owner" });
     }
 

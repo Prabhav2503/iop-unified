@@ -230,7 +230,7 @@ export default function AddMemberModal({ onClose, onSuccess }) {
           />
         </Field>
 
-        <Field label="Vertical">
+        <Field label="Vertical *">
           <Select
             value={form.vertical}
             required

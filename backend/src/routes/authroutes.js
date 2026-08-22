@@ -39,7 +39,8 @@ router.post("/login", loginClientValidator, async (req, res) => {
         : [];
 
     const token = await tokengenerator({
-      userid: data.id,
+      id: data.profile_id,
+      userid: data.profile_id,
       profile_id: data.profile_id,
       username: data.username,
       role,
@@ -55,7 +56,8 @@ router.post("/login", loginClientValidator, async (req, res) => {
     return res.status(200).json({
       message: "Login successful",
       data: {
-        userid: data.id,
+        id: data.profile_id,
+        userid: data.profile_id,
         profile_id: data.profile_id,
         username: data.username,
         role,
