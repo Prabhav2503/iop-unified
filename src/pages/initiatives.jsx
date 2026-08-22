@@ -5,6 +5,8 @@ import {
   X,
   Loader2,
   ChevronDown,
+  ChevronRight,
+  ArrowLeft,
   Check,
   Edit2,
   UserPlus,
@@ -1065,7 +1067,7 @@ export default function InitiativesPage() {
   // Replays the list's load-in on every scope / status click.
   const [listReplayKey, replayList] = useFilterReplay();
 
-  const [expandedId, setExpandedId] = useState(null);
+  const [selectedInitiativeId, setSelectedInitiativeId] = useState(null);
   const [expandedStages, setExpandedStages] = useState([]);
   const [expandedTeamIds, setExpandedTeamIds] = useState([]);
   const [detailsLoading, setDetailsLoading] = useState(false);
@@ -1117,13 +1119,8 @@ export default function InitiativesPage() {
     void fetchData();
   }, [fetchData]);
 
-  const handleToggleExpand = async (initId) => {
-    if (expandedId === initId) {
-      setExpandedId(null);
-      return;
-    }
-
-    setExpandedId(initId);
+  const handleOpenInitiative = async (initId) => {
+    setSelectedInitiativeId(initId);
     setDetailsLoading(true);
 
     try {
@@ -1177,7 +1174,7 @@ export default function InitiativesPage() {
       alert(`Delete failed: ${res.error}`);
     } else {
       setInitiatives((prev) => prev.filter((i) => i.id !== id));
-      if (expandedId === id) setExpandedId(null);
+      if (selectedInitiativeId === id) setSelectedInitiativeId(null);
     }
   };
 
@@ -1212,6 +1209,9 @@ export default function InitiativesPage() {
   // Group into My Initiatives vs Other Initiatives
   const { myInitiatives, otherInitiatives } = partitionInitiatives(filteredInitiatives, user);
 
+  // Selected initiative
+  const selectedInitiative = initiatives.find((i) => i.id === selectedInitiativeId);
+
   // ── Summary figures. Every one of these is derived from `initiatives` and
   // ── `tasks` already in state — no additional requests, no new fields.
   const myTotal = initiatives.filter((i) => isMyInitiative(i, user)).length;
@@ -1232,7 +1232,6 @@ export default function InitiativesPage() {
   }).length;
 
   const renderInitiativeCard = (init) => {
-    const isExpanded = expandedId === init.id;
     const isDeleting = deletingId === init.id;
     const initiativeTasks = tasks.filter((t) => t.initiative_id === init.id);
     const progress = taskProgress(initiativeTasks);
@@ -1243,26 +1242,20 @@ export default function InitiativesPage() {
     return (
       <article
         key={init.id}
-        className="rounded-surface border border-line bg-surface shadow-card"
+        onClick={() => handleOpenInitiative(init.id)}
+        className="group relative cursor-pointer rounded-surface border border-line bg-surface p-5 shadow-card transition-all duration-150 hover:border-accent-400/50 hover:shadow-overlay"
       >
-        {/* Header row — the toggle is a real button; delete sits beside it,
-            not nested inside it. */}
-        <div className="flex items-start gap-3 p-5">
-          <button
-            type="button"
-            onClick={() => handleToggleExpand(init.id)}
-            aria-expanded={isExpanded}
-            className={`flex flex-1 items-start gap-3.5 rounded-control text-left ${FOCUS}`}
-          >
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-1 items-start gap-3.5">
             <IconChip icon={Rocket} tone={STATUS_TONE[init.status] || 'neutral'} />
 
             <div className="min-w-0 flex-1 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-section font-semibold text-ink">{init.name}</h3>
+                <h3 className="text-section font-semibold text-ink transition-colors group-hover:text-accent-300">
+                  {init.name}
+                </h3>
                 <StatusChip status={init.status} />
-                {isPassed && (
-                  <Chip tone="warn">Deadline passed</Chip>
-                )}
+                {isPassed && <Chip tone="warn">Deadline passed</Chip>}
               </div>
 
               {init.description && (
@@ -1271,10 +1264,6 @@ export default function InitiativesPage() {
                 </p>
               )}
 
-              {/* Meta line. Icons are 12px to match the meta text exactly and
-                  inherit its faint colour, so they aid scanning without
-                  competing. They also separate the items well enough that the
-                  dot separators are no longer earning their place. */}
               <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-meta text-ink-faint">
                 {init.deadline && (
                   <span className="inline-flex items-center gap-1.5">
@@ -1319,13 +1308,7 @@ export default function InitiativesPage() {
                 </div>
               )}
             </div>
-
-            <ChevronDown
-              className={`mt-1 h-4 w-4 shrink-0 text-ink-faint transition-transform duration-150 ${
-                isExpanded ? 'rotate-180' : ''
-              }`}
-            />
-          </button>
+          </div>
 
           <div className="flex shrink-0 items-center gap-1">
             {init.whatsapp_link && (
@@ -1368,212 +1351,336 @@ export default function InitiativesPage() {
                 )}
               </IconButton>
             )}
+
+            <div className="ml-1 text-ink-faint transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-accent-300">
+              <ChevronRight className="h-5 w-5" />
+            </div>
+          </div>
+        </div>
+      </article>
+    );
+  };
+
+  // Dedicated Detail Section View for Selected Initiative
+  const renderInitiativeDetail = (init) => {
+    const isDeleting = deletingId === init.id;
+    const initiativeTasks = tasks.filter((t) => t.initiative_id === init.id);
+    const progress = taskProgress(initiativeTasks);
+    const isPassed = isDeadlinePassed(init.deadline);
+    const canDeleteInitiative = isMyCreator(init.created_by, user) || privileged;
+    const canEditInitiative = isMyCreator(init.created_by, user) || privileged;
+
+    return (
+      <div className="space-y-6 animate-rise-in">
+        {/* Back navigation bar with actions */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setSelectedInitiativeId(null)}
+            className="inline-flex items-center gap-2 rounded-control border border-line bg-surface px-3.5 py-2 text-body font-semibold text-ink transition-colors hover:border-accent-400 hover:bg-muted active:scale-[0.98]"
+          >
+            <ArrowLeft className="h-4 w-4 text-accent-300" />
+            <span>Back to all initiatives</span>
+          </button>
+
+          <div className="flex items-center gap-2">
+            {init.whatsapp_link && (
+              <a
+                href={formatUrl(init.whatsapp_link)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open WhatsApp group"
+                className="inline-flex items-center gap-2 rounded-control border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-meta font-semibold text-emerald-400 transition-colors hover:bg-emerald-500/20"
+              >
+                <WhatsAppIcon className="h-4 w-4" />
+                <span>WhatsApp group</span>
+              </a>
+            )}
+
+            {canEditInitiative && (
+              <button
+                type="button"
+                onClick={() => setEditingInitiative(init)}
+                className="inline-flex items-center gap-1.5 rounded-control border border-line bg-surface px-3 py-1.5 text-meta font-semibold text-ink transition-colors hover:bg-muted"
+              >
+                <Edit2 className="h-3.5 w-3.5" />
+                <span>Edit initiative</span>
+              </button>
+            )}
+
+            {canDeleteInitiative && (
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={(e) => handleDeleteInitiative(e, init.id)}
+                className="inline-flex items-center gap-1.5 rounded-control border border-danger-border bg-danger-soft px-3 py-1.5 text-meta font-semibold text-danger-ink transition-colors hover:bg-danger-soft/80"
+              >
+                {isDeleting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+                <span>Delete</span>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Expanding rises in; collapsing cuts. Animating the collapse would
-            mean keeping every card's stages and tasks mounted so their height
-            could be transitioned, and paying that on a page that can hold
-            dozens of initiatives — for a beat nobody watches, since the row
-            you clicked is what you are looking at. The chevron rotates both
-            ways, which is where the affordance actually lives. */}
-        {isExpanded && (
-          <div className="animate-rise-in space-y-6 border-t border-line-subtle px-5 py-5">
-            {detailsLoading ? (
-              <div className="flex items-center gap-2 py-1 text-meta text-ink-faint">
-                <Loader2 className="h-4 w-4 animate-spin" /> Loading stages and team...
+        {/* Initiative Overview Card */}
+        <article className="rounded-surface border border-line bg-surface p-6 shadow-card space-y-4">
+          <div className="flex items-start gap-4">
+            <IconChip icon={Rocket} tone={STATUS_TONE[init.status] || 'neutral'} size="lg" />
+
+            <div className="min-w-0 flex-1 space-y-3">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h1 className="font-display text-title font-bold text-ink">{init.name}</h1>
+                <StatusChip status={init.status} />
+                {isPassed && <Chip tone="warn">Deadline passed</Chip>}
               </div>
-            ) : (
-              <>
-                {/* Assigned team — inline chips, no container */}
-                <div className="space-y-2">
-                  <GroupLabel
-                    action={
-                      !isPassed && privileged && (
-                        <button
-                          type="button"
-                          onClick={() => setShowEditTeamModalFor(init.id)}
-                          className={BTN_QUIET}
-                        >
-                          <UserPlus className="h-3.5 w-3.5" /> Edit team
-                        </button>
-                      )
-                    }
-                  >
-                    Assigned team ({expandedTeamIds.length})
-                  </GroupLabel>
 
-                  {expandedTeamIds.length === 0 ? (
-                    <p className="text-meta text-ink-faint">
-                      No team members linked to this initiative.
-                    </p>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {expandedTeamIds.map((tid) => {
-                        const teamMember = allTeams.find((tm) => tm.id === tid);
-                        return (
-                          <span
-                            key={tid}
-                            className="rounded-control bg-muted px-2 py-0.5 text-micro font-medium text-ink-muted"
-                          >
-                            {teamMember ? teamMember.name : `Member ${tid.slice(0, 6)}...`}
+              {init.description && (
+                <p className="max-w-4xl text-body text-ink-muted leading-relaxed">
+                  {init.description}
+                </p>
+              )}
+
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1 text-meta text-ink-faint">
+                {init.deadline && (
+                  <span className="inline-flex items-center gap-1.5 font-medium text-ink-muted">
+                    <Calendar className="h-4 w-4 shrink-0 text-ink-faint" aria-hidden="true" />
+                    <span className="tabular-nums">Due {formatDate(init.deadline)}</span>
+                  </span>
+                )}
+
+                <span className="inline-flex items-center gap-1.5 text-ink-muted">
+                  <CheckSquare className="h-4 w-4 shrink-0 text-ink-faint" aria-hidden="true" />
+                  <span className="tabular-nums font-medium">{initiativeTasks.length} total tasks</span>
+                </span>
+
+                {init.impact && (
+                  <span className="inline-flex items-center gap-1.5 text-ink-muted">
+                    <Target className="h-4 w-4 shrink-0 text-ink-faint" aria-hidden="true" />
+                    <span>{init.impact}</span>
+                  </span>
+                )}
+              </div>
+
+              {progress && (
+                <div className="flex max-w-lg items-center gap-3 pt-2">
+                  <ProgressBar value={progress.pct} />
+                  <span className="shrink-0 text-meta font-medium tabular-nums text-ink-faint">
+                    {progress.done}/{progress.total} tasks completed ({progress.pct}%)
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </article>
+
+        {/* Details: Assigned team + Stages & Tasks */}
+        {detailsLoading ? (
+          <div className="flex items-center justify-center gap-2 rounded-surface border border-line bg-surface py-12 text-body text-ink-faint">
+            <Loader2 className="h-5 w-5 animate-spin" /> Loading stages and team details...
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Assigned team card */}
+            <div className="rounded-surface border border-line bg-surface p-5 shadow-card space-y-4">
+              <div className="flex items-center justify-between gap-3 border-b border-line-subtle pb-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-display text-section font-semibold text-ink">Assigned team</h3>
+                  <span className="rounded-control bg-muted px-2 py-0.5 text-micro font-medium tabular-nums text-ink-faint">
+                    {expandedTeamIds.length}
+                  </span>
+                </div>
+
+                {!isPassed && privileged && (
+                  <button
+                    type="button"
+                    onClick={() => setShowEditTeamModalFor(init.id)}
+                    className={BTN_QUIET}
+                  >
+                    <UserPlus className="h-3.5 w-3.5" /> Edit team
+                  </button>
+                )}
+              </div>
+
+              {expandedTeamIds.length === 0 ? (
+                <p className="text-body text-ink-faint">
+                  No team members linked to this initiative yet.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {expandedTeamIds.map((tid) => {
+                    const teamMember = allTeams.find((tm) => tm.id === tid);
+                    return (
+                      <span
+                        key={tid}
+                        className="inline-flex items-center gap-1.5 rounded-control border border-line bg-canvas px-3 py-1.5 text-meta font-medium text-ink-muted"
+                      >
+                        <span className="font-semibold text-ink">
+                          {teamMember ? teamMember.name : `Member ${tid.slice(0, 6)}...`}
+                        </span>
+                        {teamMember?.role && (
+                          <span className="text-micro text-ink-faint">
+                            ({Array.isArray(teamMember.role) ? teamMember.role.join(', ') : teamMember.role})
                           </span>
-                        );
-                      })}
-                    </div>
-                  )}
+                        )}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Stages & Tasks card */}
+            <div className="rounded-surface border border-line bg-surface p-5 shadow-card space-y-5">
+              <div className="flex items-center justify-between gap-3 border-b border-line-subtle pb-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-display text-section font-semibold text-ink">Stages & tasks</h3>
+                  <span className="rounded-control bg-muted px-2 py-0.5 text-micro font-medium tabular-nums text-ink-faint">
+                    {expandedStages.length} stage{expandedStages.length !== 1 ? 's' : ''}
+                  </span>
                 </div>
 
-                {/* Stages and tasks */}
-                <div className="space-y-2">
-                  <GroupLabel
-                    action={
-                      !isPassed && privileged && (
-                        <button
-                          type="button"
-                          onClick={() => setShowAddStageModalFor(init.id)}
-                          className={BTN_QUIET}
-                        >
-                          <Plus className="h-3.5 w-3.5" /> Add stage
-                        </button>
-                      )
-                    }
+                {!isPassed && privileged && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddStageModalFor(init.id)}
+                    className={BTN_QUIET}
                   >
-                    Stages ({expandedStages.length})
-                  </GroupLabel>
+                    <Plus className="h-3.5 w-3.5" /> Add stage
+                  </button>
+                )}
+              </div>
 
-                  {expandedStages.length === 0 ? (
-                    <p className="text-meta text-ink-faint">
-                      No stages yet. Tasks live inside a stage, so add one first.
-                    </p>
-                  ) : (
-                    <div className="divide-y divide-line-subtle border-t border-line-subtle">
-                      {expandedStages.map((stg) => {
-                        const rawStageTasks = initiativeTasks.filter(
-                          (t) => (t.stage_id || t.stage_tasks?.[0]?.stage_id) === stg.id
-                        );
-                        const sortedStageTasks = sortTasks(rawStageTasks);
+              {expandedStages.length === 0 ? (
+                <p className="py-2 text-body text-ink-faint">
+                  No stages yet. Tasks live inside a stage, so add one first.
+                </p>
+              ) : (
+                <div className="divide-y divide-line-subtle">
+                  {expandedStages.map((stg) => {
+                    const rawStageTasks = initiativeTasks.filter(
+                      (t) => (t.stage_id || t.stage_tasks?.[0]?.stage_id) === stg.id
+                    );
+                    const sortedStageTasks = sortTasks(rawStageTasks);
 
-                        return (
-                          <div key={stg.id} className="py-4">
-                            {/* Stage header — a heading, not a nested card */}
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="flex min-w-0 items-center gap-2.5">
-                                <IconChip icon={Layers} size="sm" />
-                                <h5 className="flex items-baseline gap-2 truncate text-body font-semibold text-ink">
-                                  {stg.name}
-                                  <span className="text-meta font-normal tabular-nums text-ink-faint">
-                                    {sortedStageTasks.length}
-                                  </span>
-                                </h5>
-                              </div>
-
-                              {!isPassed && privileged && (
-                                <div className="flex shrink-0 items-center gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setAddTaskStageTarget({ id: stg.id, name: stg.name })
-                                    }
-                                    className={BTN_QUIET}
-                                  >
-                                    <Plus className="h-3.5 w-3.5" /> Add task
-                                  </button>
-                                  <IconButton
-                                    danger
-                                    label="Delete stage"
-                                    onClick={() => handleDeleteStage(stg.id)}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </IconButton>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Task rows — a hairline rule ties them to the
-                                stage without adding another box */}
-                            {sortedStageTasks.length === 0 ? (
-                              <p className="ml-[38px] mt-2 text-meta text-ink-faint">
-                                No tasks in this stage yet.
-                              </p>
-                            ) : (
-                              <ul className="ml-[13px] mt-3 divide-y divide-line-subtle border-l border-line pl-5">
-                                {sortedStageTasks.map((tsk) => (
-                                  <li
-                                    key={tsk.id}
-                                    className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0"
-                                  >
-                                    <div className="min-w-0 flex-1">
-                                      <p className="text-body text-ink">{tsk.title}</p>
-
-                                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-ink-faint">
-                                        <span className="inline-flex items-center gap-1.5">
-                                          <span
-                                            aria-hidden="true"
-                                            className={`h-1.5 w-1.5 rounded-full ${
-                                              PRIORITY_DOT[tsk.priority] || PRIORITY_DOT.medium
-                                            }`}
-                                          />
-                                          <span className="capitalize">
-                                            {tsk.priority || 'medium'}
-                                          </span>
-                                        </span>
-                                        <MetaDot />
-                                        <span className="capitalize">
-                                          {(tsk.status || 'todo').replace('_', ' ')}
-                                        </span>
-                                        {tsk.deadline && (
-                                          <>
-                                            <MetaDot />
-                                            <span className="tabular-nums">
-                                              Due {formatDate(tsk.deadline)}
-                                            </span>
-                                          </>
-                                        )}
-                                      </p>
-                                      {tsk.comment && (
-                                        <p className="mt-1 border-l-2 border-line pl-2 text-meta text-ink-faint">
-                                          {tsk.comment}
-                                        </p>
-                                      )}
-                                    </div>
-
-                                    {!isPassed && (isMyCreator(tsk.creator_id, user) || privileged) && (
-                                      <div className="flex shrink-0 items-center gap-0.5">
-                                        {isMyCreator(tsk.creator_id, user) && (
-                                          <IconButton
-                                            label="Edit task"
-                                            onClick={() => setEditingTask(tsk)}
-                                          >
-                                            <Edit2 className="h-3.5 w-3.5" />
-                                          </IconButton>
-                                        )}
-                                        {(isMyCreator(tsk.creator_id, user) || privileged) && (
-                                          <IconButton
-                                            danger
-                                            label="Delete task"
-                                            onClick={() => handleDeleteTask(tsk.id)}
-                                          >
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                          </IconButton>
-                                        )}
-                                      </div>
-                                    )}
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
+                    return (
+                      <div key={stg.id} className="py-4 first:pt-0 last:pb-0 space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <IconChip icon={Layers} size="sm" />
+                            <h4 className="flex items-baseline gap-2 truncate text-body font-semibold text-ink">
+                              {stg.name}
+                              <span className="text-meta font-normal tabular-nums text-ink-faint">
+                                ({sortedStageTasks.length} task{sortedStageTasks.length !== 1 ? 's' : ''})
+                              </span>
+                            </h4>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
+
+                          {!isPassed && privileged && (
+                            <div className="flex shrink-0 items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setAddTaskStageTarget({ id: stg.id, name: stg.name })
+                                }
+                                className={BTN_QUIET}
+                              >
+                                <Plus className="h-3.5 w-3.5" /> Add task
+                              </button>
+                              <IconButton
+                                danger
+                                label="Delete stage"
+                                onClick={() => handleDeleteStage(stg.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </IconButton>
+                            </div>
+                          )}
+                        </div>
+
+                        {sortedStageTasks.length === 0 ? (
+                          <p className="ml-9 text-meta text-ink-faint">
+                            No tasks in this stage yet.
+                          </p>
+                        ) : (
+                          <ul className="ml-4 divide-y divide-line-subtle border-l-2 border-line pl-5">
+                            {sortedStageTasks.map((tsk) => (
+                              <li
+                                key={tsk.id}
+                                className="flex items-start justify-between gap-3 py-2.5 first:pt-1 last:pb-1"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-body font-medium text-ink">{tsk.title}</p>
+
+                                  <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-ink-faint">
+                                    <span className="inline-flex items-center gap-1.5">
+                                      <span
+                                        aria-hidden="true"
+                                        className={`h-1.5 w-1.5 rounded-full ${
+                                          PRIORITY_DOT[tsk.priority] || PRIORITY_DOT.medium
+                                        }`}
+                                      />
+                                      <span className="capitalize">
+                                        {tsk.priority || 'medium'}
+                                      </span>
+                                    </span>
+                                    <MetaDot />
+                                    <span className="capitalize">
+                                      {(tsk.status || 'todo').replace('_', ' ')}
+                                    </span>
+                                    {tsk.deadline && (
+                                      <>
+                                        <MetaDot />
+                                        <span className="tabular-nums">
+                                          Due {formatDate(tsk.deadline)}
+                                        </span>
+                                      </>
+                                    )}
+                                  </p>
+                                  {tsk.comment && (
+                                    <p className="mt-1 border-l-2 border-line pl-2 text-meta text-ink-faint">
+                                      {tsk.comment}
+                                    </p>
+                                  )}
+                                </div>
+
+                                {!isPassed && (isMyCreator(tsk.creator_id, user) || privileged) && (
+                                  <div className="flex shrink-0 items-center gap-0.5">
+                                    {isMyCreator(tsk.creator_id, user) && (
+                                      <IconButton
+                                        label="Edit task"
+                                        onClick={() => setEditingTask(tsk)}
+                                      >
+                                        <Edit2 className="h-3.5 w-3.5" />
+                                      </IconButton>
+                                    )}
+                                    {(isMyCreator(tsk.creator_id, user) || privileged) && (
+                                      <IconButton
+                                        danger
+                                        label="Delete task"
+                                        onClick={() => handleDeleteTask(tsk.id)}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </IconButton>
+                                    )}
+                                  </div>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              </>
-            )}
+              )}
+            </div>
           </div>
         )}
-      </article>
+      </div>
     );
   };
 
@@ -1645,7 +1752,7 @@ export default function InitiativesPage() {
 
       {addTaskStageTarget && (
         <AddTaskModal
-          initiativeId={expandedId}
+          initiativeId={selectedInitiativeId}
           stageId={addTaskStageTarget.id}
           stageName={addTaskStageTarget.name}
           onClose={() => setAddTaskStageTarget(null)}
@@ -1668,121 +1775,121 @@ export default function InitiativesPage() {
       )}
 
       <div className="max-w-6xl space-y-6 px-4 py-4 sm:px-7 sm:py-7">
-        <PageHeader
-          title="Initiatives"
-          description="Initiatives, their stages, and the tasks inside them."
-          action={
-            privileged && (
-              <button onClick={() => setShowAddInitiativeModal(true)} className={BTN_PRIMARY}>
-                <Plus className="h-4 w-4" />
-                New initiative
-              </button>
-            )
-          }
-        />
-
-        {/* Summary — big figure, quiet label, small real indicator */}
-        {!loading && !error && (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard
-              icon={Rocket}
-              tone="neutral"
-              value={initiatives.length}
-              label="Total initiatives"
-              indicator={
-                <span className="text-micro tabular-nums text-ink-faint">{myTotal} yours</span>
+        {selectedInitiative ? (
+          renderInitiativeDetail(selectedInitiative)
+        ) : (
+          <>
+            <PageHeader
+              title="Initiatives"
+              description="Initiatives, their stages, and the tasks inside them."
+              action={
+                privileged && (
+                  <button onClick={() => setShowAddInitiativeModal(true)} className={BTN_PRIMARY}>
+                    <Plus className="h-4 w-4" />
+                    New initiative
+                  </button>
+                )
               }
             />
-            <StatCard
-              icon={Activity}
-              tone="accent"
-              value={activeCount}
-              label="Active now"
-              // indicator={
-              //   <span className="rounded-control bg-accent-soft px-2 py-0.5 text-micro font-medium tabular-nums text-accent-300">
-              //     {activeShare}%
-              //   </span>
-              // }
-            />
-            
-          </div>
+
+            {/* Summary — big figure, quiet label, small real indicator */}
+            {!loading && !error && (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <StatCard
+                  icon={Rocket}
+                  tone="neutral"
+                  value={initiatives.length}
+                  label="Total initiatives"
+                  indicator={
+                    <span className="text-micro tabular-nums text-ink-faint">{myTotal} yours</span>
+                  }
+                />
+                <StatCard
+                  icon={Activity}
+                  tone="accent"
+                  value={activeCount}
+                  label="Active now"
+                />
+              </div>
+            )}
+
+            {/* One control row: search, scope, status */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search initiatives..."
+              />
+
+              <div className="flex shrink-0 items-center gap-2">
+                {/* Scope — recessed track, raised active cell: reads as a
+                    physical switch rather than tabs */}
+                <div className="flex rounded-control border border-line bg-canvas p-1">
+                  {[
+                    { id: 'all', label: 'All' },
+                    { id: 'my', label: 'Mine' },
+                    { id: 'others', label: 'Others' },
+                  ].map((tab) => {
+                    const active = classificationFilter === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => {
+                          setClassificationFilter(tab.id);
+                          replayList();
+                        }}
+                        aria-pressed={active}
+                        className={`rounded-[6px] px-3 py-1.5 text-meta font-semibold transition duration-150 ease-exit active:scale-[0.98] active:duration-100 ${FOCUS} ${
+                          active
+                            ? 'bg-accent-soft text-accent-300 shadow-card'
+                            : 'text-ink-faint hover:text-ink'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <Select
+                  value={statusFilter}
+                  onChange={(v) => {
+                    setStatusFilter(v);
+                    replayList();
+                  }}
+                  options={STATUS_FILTER_OPTIONS}
+                  ariaLabel="Filter by status"
+                />
+              </div>
+            </div>
+
+            {/* Keyed on the replay counter, not on the filter values: two filters
+                that resolve to the same list still count as two clicks, and both
+                get the same acknowledgement. Search is deliberately not wired in. */}
+            <div key={listReplayKey}>
+              {loading ? (
+                <LoadingPanel>Loading initiatives...</LoadingPanel>
+              ) : error ? (
+                <ErrorPanel>{error}</ErrorPanel>
+              ) : filteredInitiatives.length === 0 ? (
+                <EmptyPanel>No initiatives match your search or filters.</EmptyPanel>
+              ) : (
+                <div className="space-y-6">
+                  {(classificationFilter === 'all' || classificationFilter === 'my') &&
+                    renderGroup(
+                      'Your initiatives',
+                      myInitiatives,
+                      "You haven't created any initiatives yet."
+                    )}
+
+                  {(classificationFilter === 'all' || classificationFilter === 'others') &&
+                    renderGroup('Other initiatives', otherInitiatives, 'No other initiatives found.')}
+                </div>
+              )}
+            </div>
+          </>
         )}
-
-        {/* One control row: search, scope, status */}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="Search initiatives..."
-          />
-
-          <div className="flex shrink-0 items-center gap-2">
-            {/* Scope — recessed track, raised active cell: reads as a
-                physical switch rather than tabs */}
-            <div className="flex rounded-control border border-line bg-canvas p-1">
-              {[
-                { id: 'all', label: 'All' },
-                { id: 'my', label: 'Mine' },
-                { id: 'others', label: 'Others' },
-              ].map((tab) => {
-                const active = classificationFilter === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => {
-                      setClassificationFilter(tab.id);
-                      replayList();
-                    }}
-                    aria-pressed={active}
-                    className={`rounded-[6px] px-3 py-1.5 text-meta font-semibold transition duration-150 ease-exit active:scale-[0.98] active:duration-100 ${FOCUS} ${
-                      active
-                        ? 'bg-accent-soft text-accent-300 shadow-card'
-                        : 'text-ink-faint hover:text-ink'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <Select
-              value={statusFilter}
-              onChange={(v) => {
-                setStatusFilter(v);
-                replayList();
-              }}
-              options={STATUS_FILTER_OPTIONS}
-              ariaLabel="Filter by status"
-            />
-          </div>
-        </div>
-
-        {/* Keyed on the replay counter, not on the filter values: two filters
-            that resolve to the same list still count as two clicks, and both
-            get the same acknowledgement. Search is deliberately not wired in. */}
-        <div key={listReplayKey}>
-          {loading ? (
-            <LoadingPanel>Loading initiatives...</LoadingPanel>
-          ) : error ? (
-            <ErrorPanel>{error}</ErrorPanel>
-          ) : filteredInitiatives.length === 0 ? (
-            <EmptyPanel>No initiatives match your search or filters.</EmptyPanel>
-          ) : (
-            <div className="space-y-6">
-              {(classificationFilter === 'all' || classificationFilter === 'my') &&
-                renderGroup(
-                  'Your initiatives',
-                  myInitiatives,
-                  "You haven't created any initiatives yet."
-                )}
-
-              {(classificationFilter === 'all' || classificationFilter === 'others') &&
-                renderGroup('Other initiatives', otherInitiatives, 'No other initiatives found.')}
-            </div>
-          )}
-        </div>
       </div>
     </>
   );

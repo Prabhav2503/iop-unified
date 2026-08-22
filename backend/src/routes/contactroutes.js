@@ -18,6 +18,7 @@ const privilegedRoles = [
 	"admin",
 	"overall_coordinator",
 	"co_overall_coordinator",
+	"coordinator"
 ];
 
 const formatSummaryContact = (contact) => ({

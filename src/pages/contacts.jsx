@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   Plus,
   Trash2,
@@ -8,6 +8,7 @@ import {
   EyeOff,
   Mail,
   Phone,
+  Tag as TagIcon,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useContactsForRole, useCreateContact, useDeleteContact, useToggleContactVisibility } from '../hooks/useQueries';
@@ -54,17 +55,33 @@ const VISIBILITY_OPTIONS = [
   { value: 'hidden', label: 'Hidden' },
 ];
 
-// ─── Reusable TagInput for text[] fields ────────────────────────────────────
+// ─── Creatable TagInput with existing suggestions for text[] fields ─────────
 
-function TagInput({ label, values, onChange, placeholder, tone = 'neutral' }) {
+function TagInput({
+  label,
+  values = [],
+  onChange,
+  placeholder,
+  tone = 'neutral',
+  existingOptions = [],
+  hint = 'Pick existing or type & press Enter to add',
+}) {
   const [draft, setDraft] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+  const inputRef = useRef(null);
 
-  const addTag = () => {
-    const trimmed = draft.trim();
-    if (trimmed && !values.includes(trimmed)) {
+  const addTag = (tagToAdd) => {
+    const trimmed = (tagToAdd || draft).trim();
+    if (!trimmed) return;
+    const exists = values.some(
+      (v) => v.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (!exists) {
       onChange([...values, trimmed]);
     }
     setDraft('');
+    setIsOpen(false);
   };
 
   const removeTag = (tag) => onChange(values.filter((v) => v !== tag));
@@ -75,41 +92,146 @@ function TagInput({ label, values, onChange, placeholder, tone = 'neutral' }) {
       addTag();
     } else if (e.key === 'Backspace' && draft === '' && values.length > 0) {
       removeTag(values[values.length - 1]);
+    } else if (e.key === 'Escape') {
+      setIsOpen(false);
     }
   };
 
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleMouseDown = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, []);
+
+  // Filter existing options that are not yet selected
+  const availableExisting = existingOptions.filter(
+    (opt) => !values.some((v) => v.toLowerCase() === opt.toLowerCase())
+  );
+
+  const matchingSuggestions = availableExisting.filter((opt) =>
+    !draft.trim() || opt.toLowerCase().includes(draft.trim().toLowerCase())
+  );
+
+  const isExactMatch = values.concat(availableExisting).some(
+    (opt) => opt.toLowerCase() === draft.trim().toLowerCase()
+  );
+
+  const showCreateOption = draft.trim().length > 0 && !isExactMatch;
+
   return (
-    <Field label={label} hint="Press Enter or comma to add">
-      <div className="flex min-h-[38px] flex-wrap items-center gap-1.5 rounded-control border border-line bg-canvas px-2 py-1.5 focus-within:border-accent-400 focus-within:ring-2 focus-within:ring-accent-300/25">
-        {values.map((tag) => (
-          <span
-            key={tag}
-            className={`inline-flex items-center gap-1 rounded-control px-2 py-0.5 text-micro font-medium ${
-              tone === 'accent'
-                ? 'bg-accent-soft text-accent-300'
-                : 'bg-muted text-ink-muted'
-            }`}
-          >
-            {tag}
-            <button
-              type="button"
-              onClick={() => removeTag(tag)}
-              aria-label={`Remove ${tag}`}
-              className="opacity-60 transition-opacity hover:opacity-100"
+    <Field label={label} hint={hint}>
+      <div ref={containerRef} className="relative space-y-2">
+        <div
+          onClick={() => inputRef.current?.focus()}
+          className="flex min-h-[40px] flex-wrap items-center gap-1.5 rounded-control border border-line bg-canvas px-2.5 py-1.5 transition-colors focus-within:border-accent-400 focus-within:ring-2 focus-within:ring-accent-300/25"
+        >
+          {values.map((tag) => (
+            <span
+              key={tag}
+              className={`inline-flex items-center gap-1 rounded-control px-2 py-0.5 text-micro font-medium ${
+                tone === 'accent'
+                  ? 'bg-accent-soft text-accent-300'
+                  : 'bg-muted text-ink-muted'
+              }`}
             >
-              <X className="h-3 w-3" />
-            </button>
-          </span>
-        ))}
-        <input
-          type="text"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={addTag}
-          placeholder={values.length === 0 ? placeholder : ''}
-          className="min-w-[110px] flex-1 bg-transparent text-body text-ink outline-none placeholder:text-ink-faint"
-        />
+              {tag}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeTag(tag);
+                }}
+                aria-label={`Remove ${tag}`}
+                className="opacity-60 transition-opacity hover:opacity-100"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+          <input
+            ref={inputRef}
+            type="text"
+            value={draft}
+            onFocus={() => setIsOpen(true)}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setIsOpen(true);
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder={values.length === 0 ? placeholder : ''}
+            className="min-w-[130px] flex-1 bg-transparent text-body text-ink outline-none placeholder:text-ink-faint"
+          />
+        </div>
+
+        {/* Dropdown Suggestions */}
+        {isOpen && (matchingSuggestions.length > 0 || showCreateOption) && (
+          <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-control border border-line bg-surface py-1 shadow-overlay animate-fade-in">
+            {showCreateOption && (
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  addTag(draft);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-body font-medium text-accent-300 hover:bg-accent-soft"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add new tag: <strong className="text-ink">"{draft.trim()}"</strong></span>
+              </button>
+            )}
+
+            {matchingSuggestions.length > 0 && (
+              <>
+                {showCreateOption && <div className="my-1 border-t border-line-subtle" />}
+                <div className="px-3 py-1 text-micro font-semibold uppercase tracking-wide text-ink-faint">
+                  Existing tags
+                </div>
+                {matchingSuggestions.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      addTag(tag);
+                    }}
+                    className="flex w-full items-center justify-between px-3 py-1.5 text-left text-body text-ink hover:bg-muted"
+                  >
+                    <span>{tag}</span>
+                    <Plus className="h-3 w-3 text-ink-faint" />
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Quick select chips for existing unselected options */}
+        {availableExisting.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <span className="text-micro font-medium text-ink-faint">Suggestions:</span>
+            {availableExisting.slice(0, 8).map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => addTag(tag)}
+                className="inline-flex items-center gap-1 rounded-control border border-line bg-surface px-2 py-0.5 text-micro font-medium text-ink-muted transition-colors hover:border-accent-400 hover:bg-accent-soft hover:text-accent-300"
+              >
+                <Plus className="h-2.5 w-2.5" />
+                {tag}
+              </button>
+            ))}
+            {availableExisting.length > 8 && (
+              <span className="text-micro text-ink-faint">
+                +{availableExisting.length - 8} more in dropdown
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </Field>
   );
@@ -127,7 +249,13 @@ const EMPTY_CONTACT_FORM = {
   dataset_id: '',
 };
 
-function AddContactModal({ onClose, onSuccess }) {
+function AddContactModal({
+  onClose,
+  onSuccess,
+  existingTags = [],
+  existingOrganizations = [],
+  existingRoles = [],
+}) {
   const [form, setForm] = useState(EMPTY_CONTACT_FORM);
   const [formError, setFormError] = useState('');
   const createContactMutation = useCreateContact();
@@ -210,6 +338,7 @@ function AddContactModal({ onClose, onSuccess }) {
         label="Organisation"
         values={form.organization}
         onChange={setArr('organization')}
+        existingOptions={existingOrganizations}
         placeholder="e.g. IIT Delhi, EDC"
       />
 
@@ -217,6 +346,7 @@ function AddContactModal({ onClose, onSuccess }) {
         label="Roles"
         values={form.roles}
         onChange={setArr('roles')}
+        existingOptions={existingRoles}
         placeholder="e.g. Advisor, Founder"
         tone="accent"
       />
@@ -225,6 +355,7 @@ function AddContactModal({ onClose, onSuccess }) {
         label="Tags"
         values={form.tags}
         onChange={setArr('tags')}
+        existingOptions={existingTags}
         placeholder="e.g. Investor, Mentor"
       />
 
@@ -307,12 +438,43 @@ export default function ContactsPage() {
     return true;
   });
 
+  // Extract unique existing tags, organizations, and roles across contacts
+  const existingTags = Array.from(
+    new Set(
+      contacts
+        .flatMap((c) => (Array.isArray(c.tags) ? c.tags : []))
+        .map((t) => (typeof t === 'string' ? t.trim() : ''))
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+
+  const existingOrganizations = Array.from(
+    new Set(
+      contacts
+        .flatMap((c) => (Array.isArray(c.organization) ? c.organization : []))
+        .map((o) => (typeof o === 'string' ? o.trim() : ''))
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+
+  const existingRoles = Array.from(
+    new Set(
+      contacts
+        .flatMap((c) => (Array.isArray(c.roles) ? c.roles : []))
+        .map((r) => (typeof r === 'string' ? r.trim() : ''))
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+
   return (
     <>
       {showAddModal && (
         <AddContactModal
           onClose={() => setShowAddModal(false)}
           onSuccess={handleContactAdded}
+          existingTags={existingTags}
+          existingOrganizations={existingOrganizations}
+          existingRoles={existingRoles}
         />
       )}
 

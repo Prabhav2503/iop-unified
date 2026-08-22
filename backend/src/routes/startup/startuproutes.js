@@ -16,7 +16,7 @@ import {isFounderNotFoundError} from "../../utility/errors_manager.js";
 
 const router = express.Router();
 
-const privilegedRoles = ["admin", "overall_coordinator", "co_overall_coordinator"];
+const privilegedRoles = ["admin", "overall_coordinator", "co_overall_coordinator","coordinator"];
 
 router.post("/", startupCreateValidator, async (req, res) => {
 	if (handleValidationErrors(req, res)) {

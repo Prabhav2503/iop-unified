@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, Loader2, Search, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getTeamMemberById, updateTeamMember } from '../API/team';
 import { getActiveInitiatives } from '../API/initiative';
@@ -49,6 +49,192 @@ function getRoleDisplay(role) {
 
 const ROLE_OPTIONS = ROLES.map((r) => ({ value: r, label: getRoleDisplay([r]) }));
 const VERTICAL_OPTIONS = VERTICALS.map((v) => ({ value: v, label: v }));
+
+// ── Searchable multi-select dropdown for initiatives ─────────────────────
+function SearchableInitiativeSelect({
+  initiatives = [],
+  selectedIds = [],
+  onChange,
+  loading = false,
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    const handleMouseDown = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    } else {
+      setSearch('');
+    }
+  }, [open]);
+
+  const filtered = initiatives.filter((ini) =>
+    (ini.name || '').toLowerCase().includes(search.toLowerCase().trim())
+  );
+
+  const selectedInitiatives = initiatives.filter((ini) =>
+    selectedIds.includes(ini.id)
+  );
+
+  const toggleInitiative = (id) => {
+    if (selectedIds.includes(id)) {
+      onChange(selectedIds.filter((i) => i !== id));
+    } else {
+      onChange([...selectedIds, id]);
+    }
+  };
+
+  const handleRemoveChip = (e, id) => {
+    e.stopPropagation();
+    onChange(selectedIds.filter((i) => i !== id));
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 rounded-control border border-line bg-canvas px-3 py-2 text-meta text-ink-faint">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading initiatives...
+      </div>
+    );
+  }
+
+  if (initiatives.length === 0) {
+    return (
+      <p className="rounded-control border border-line bg-canvas px-3 py-2 text-meta text-ink-faint">
+        No active initiatives found
+      </p>
+    );
+  }
+
+  return (
+    <div ref={containerRef} className="relative space-y-2">
+      {/* Dropdown Trigger */}
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between gap-2 rounded-control border border-line bg-canvas px-3 py-2 text-left text-body text-ink transition-colors hover:border-accent-400 focus:border-accent-400 focus:outline-none focus:ring-2 focus:ring-accent-300/25"
+      >
+        <span className="truncate text-body text-ink">
+          {selectedIds.length === 0
+            ? 'Select initiatives...'
+            : `${selectedIds.length} initiative${selectedIds.length > 1 ? 's' : ''} selected`}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-ink-faint transition-transform duration-150 ${
+            open ? 'rotate-180 text-ink' : ''
+          }`}
+        />
+      </button>
+
+      {/* Selected Initiative Chips */}
+      {selectedInitiatives.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+          {selectedInitiatives.map((ini) => (
+            <span
+              key={ini.id}
+              className="inline-flex items-center gap-1 rounded-control bg-accent-soft px-2 py-0.5 text-micro font-medium text-accent-300"
+            >
+              <span className="max-w-[200px] truncate">{ini.name}</span>
+              <button
+                type="button"
+                onClick={(e) => handleRemoveChip(e, ini.id)}
+                aria-label={`Remove ${ini.name}`}
+                className="opacity-70 transition-opacity hover:opacity-100"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+          {selectedInitiatives.length > 1 && (
+            <button
+              type="button"
+              onClick={() => onChange([])}
+              className="text-micro font-medium text-ink-faint hover:text-danger"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Searchable Dropdown Overlay */}
+      {open && (
+        <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-hidden rounded-control border border-line bg-surface shadow-overlay animate-fade-in flex flex-col">
+          {/* Search Box */}
+          <div className="relative border-b border-line-subtle p-2">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-faint" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search initiatives..."
+              className="w-full rounded-control border border-line bg-canvas py-1.5 pl-8 pr-7 text-meta text-ink placeholder:text-ink-faint focus:border-accent-400 focus:outline-none"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-faint hover:text-ink"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* List of Filtered Initiatives */}
+          <div className="max-h-48 overflow-y-auto divide-y divide-line-subtle overscroll-contain">
+            {filtered.length === 0 ? (
+              <p className="px-3 py-3 text-center text-meta text-ink-faint">
+                No initiatives found matching "{search}"
+              </p>
+            ) : (
+              filtered.map((ini) => {
+                const selected = selectedIds.includes(ini.id);
+                return (
+                  <label
+                    key={ini.id}
+                    className={`flex cursor-pointer items-center justify-between gap-2.5 px-3 py-2 text-body transition-colors ${
+                      selected
+                        ? 'bg-accent-soft font-medium text-accent-300'
+                        : 'text-ink-muted hover:bg-muted hover:text-ink'
+                    }`}
+                  >
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleInitiative(ini.id)}
+                        className="h-3.5 w-3.5 shrink-0 rounded border-line accent-accent-300"
+                      />
+                      <span className="truncate">{ini.name}</span>
+                    </div>
+                    {ini.status && (
+                      <span className="shrink-0 text-micro capitalize text-ink-faint">
+                        {ini.status.replace('_', ' ')}
+                      </span>
+                    )}
+                  </label>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Reusable tag-input for text[] fields ──────────────────────────────────
 function TagInput({ label, values = [], onChange, placeholder }) {
@@ -350,49 +536,15 @@ export default function EditProfileModal({ onClose, onSuccess }) {
             hint={
               form.initiative.length > 0
                 ? `${form.initiative.length} selected`
-                : undefined
+                : 'Select one or more initiatives'
             }
           >
-            {initiativesLoading ? (
-              <div className="flex items-center gap-2 rounded-control border border-line bg-canvas px-3 py-2 text-meta text-ink-faint">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading initiatives...
-              </div>
-            ) : initiatives.length === 0 ? (
-              <p className="rounded-control border border-line bg-canvas px-3 py-2 text-meta text-ink-faint">
-                No active initiatives found
-              </p>
-            ) : (
-              <div className="max-h-40 overflow-y-auto rounded-control border border-line bg-canvas">
-                {initiatives.map((ini) => {
-                  const selected = form.initiative.includes(ini.id);
-                  return (
-                    <label
-                      key={ini.id}
-                      className={`flex cursor-pointer items-center gap-2.5 px-3 py-2 text-body transition-colors duration-150 ${
-                        selected
-                          ? 'bg-accent-soft font-medium text-accent-300'
-                          : 'text-ink-muted hover:bg-muted hover:text-ink'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selected}
-                        onChange={() => {
-                          setForm((f) => ({
-                            ...f,
-                            initiative: selected
-                              ? f.initiative.filter((id) => id !== ini.id)
-                              : [...f.initiative, ini.id],
-                          }));
-                        }}
-                        className="h-3.5 w-3.5 shrink-0 rounded border-line accent-accent-300"
-                      />
-                      <span className="truncate">{ini.name}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            )}
+            <SearchableInitiativeSelect
+              initiatives={initiatives}
+              selectedIds={form.initiative}
+              onChange={setVal('initiative')}
+              loading={initiativesLoading}
+            />
           </Field>
 
           <TagInput
