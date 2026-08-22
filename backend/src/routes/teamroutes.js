@@ -12,7 +12,7 @@ import { getUserRoles } from "../utility/helper.js";
 
 const router = express.Router();
 
-const privilegedRoles = ["admin", "overall_coordinator","co_overall_coordinator","coordinators"];
+const privilegedRoles = ["admin", "overall_coordinator", "co_overall_coordinator", "coordinator"];
 
 router.post("/register", teamCreateValidator, async (req, res) => {
   if (handleValidationErrors(req, res)) {

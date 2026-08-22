@@ -4,7 +4,7 @@
   "description": "IOP - Internal Operation Portal (Frontend + Backend unified)",
   "type": "module",
   "scripts": {
-    "dev:backend": "node backend/index.js",
+    "dev:backend": "node --watch backend/index.js",
     "dev:frontend": "vite",
     "build": "vite build",
     "preview": "vite preview"
