@@ -385,21 +385,25 @@ export function Select({
   variant = 'toolbar',
   isMulti = false,
   placeholder = 'Select option...',
+  searchable,
 }) {
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const [rect, setRect] = useState(null);
+  const [search, setSearch] = useState('');
   const triggerRef = useRef(null);
   const listRef = useRef(null);
+  const searchInputRef = useRef(null);
   const closeTimer = useRef(null);
 
   const isOpen = open && !closing;
+  const isSearchable = searchable !== undefined ? searchable : options.length > 5 || isMulti;
 
   const place = useCallback(() => {
     const el = triggerRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    setRect({ top: r.bottom + 4, left: r.left, width: r.width });
+    setRect({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, 220) });
   }, []);
 
   const openList = useCallback(() => {
@@ -427,6 +431,16 @@ export function Select({
     },
     []
   );
+
+  useEffect(() => {
+    if (isOpen) {
+      if (isSearchable) {
+        setTimeout(() => searchInputRef.current?.focus(), 50);
+      }
+    } else {
+      setSearch('');
+    }
+  }, [isOpen, isSearchable]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -475,6 +489,12 @@ export function Select({
       options.find((o) => String(o.value ?? '') === String(value ?? '')) || options[0];
     triggerLabel = current?.label || placeholder;
   }
+
+  const filteredOptions = isSearchable && search.trim()
+    ? options.filter((opt) =>
+        (opt.label || '').toLowerCase().includes(search.toLowerCase().trim())
+      )
+    : options;
 
   const handleOptionClick = (optValue) => {
     if (isMulti) {
@@ -540,53 +560,86 @@ export function Select({
       {open &&
         rect &&
         createPortal(
-          <ul
+          <div
             ref={listRef}
-            role="listbox"
-            aria-label={ariaLabel}
             style={{
               position: 'fixed',
               top: rect.top,
               left: rect.left,
-              minWidth: rect.width,
+              width: Math.max(rect.width, 220),
             }}
-            className={`z-[60] max-h-64 origin-top overflow-y-auto rounded-control border border-line bg-raised py-1 shadow-overlay ${
+            className={`z-[60] flex max-h-72 flex-col origin-top overflow-hidden rounded-control border border-line bg-raised shadow-overlay ${
               closing ? 'pointer-events-none animate-pop-out' : 'animate-pop-in'
             }`}
           >
-            {options.map((opt) => {
-              const selected = isOptionSelected(opt.value);
-              return (
-                <li key={opt.value} role="option" aria-selected={selected}>
+            {isSearchable && (
+              <div className="relative border-b border-line-subtle p-2 bg-surface">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-faint" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search..."
+                  className="w-full rounded-control border border-line bg-canvas py-1 pl-8 pr-7 text-meta text-ink placeholder:text-ink-faint focus:border-accent-400 focus:outline-none"
+                />
+                {search && (
                   <button
                     type="button"
-                    onClick={() => handleOptionClick(opt.value)}
-                    className={`flex w-full items-center justify-between gap-4 whitespace-nowrap px-3 py-1.5 text-left text-meta transition-colors duration-150 ${
-                      selected
-                        ? 'bg-accent-soft font-medium text-accent-300'
-                        : 'text-ink-muted hover:bg-muted hover:text-ink'
-                    }`}
+                    onClick={() => setSearch('')}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-faint hover:text-ink"
                   >
-                    <span className="flex items-center gap-2">
-                      {isMulti && (
-                        <span
-                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
-                            selected
-                              ? 'border-accent-400 bg-accent-500 text-white'
-                              : 'border-line bg-canvas'
-                          }`}
-                        >
-                          {selected && <Check className="h-3 w-3" />}
-                        </span>
-                      )}
-                      {opt.label}
-                    </span>
-                    {!isMulti && selected && <Check className="h-3.5 w-3.5 shrink-0" />}
+                    <X className="h-3 w-3" />
                   </button>
+                )}
+              </div>
+            )}
+
+            <ul
+              role="listbox"
+              aria-label={ariaLabel}
+              className="max-h-56 overflow-y-auto overscroll-contain py-1"
+            >
+              {filteredOptions.length === 0 ? (
+                <li className="px-3 py-2.5 text-center text-meta text-ink-faint">
+                  No options found
                 </li>
-              );
-            })}
-          </ul>,
+              ) : (
+                filteredOptions.map((opt) => {
+                  const selected = isOptionSelected(opt.value);
+                  return (
+                    <li key={opt.value} role="option" aria-selected={selected}>
+                      <button
+                        type="button"
+                        onClick={() => handleOptionClick(opt.value)}
+                        className={`flex w-full items-center justify-between gap-4 px-3 py-1.5 text-left text-meta transition-colors duration-150 ${
+                          selected
+                            ? 'bg-accent-soft font-medium text-accent-300'
+                            : 'text-ink-muted hover:bg-muted hover:text-ink'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2 truncate">
+                          {isMulti && (
+                            <span
+                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+                                selected
+                                  ? 'border-accent-400 bg-accent-500 text-white'
+                                  : 'border-line bg-canvas'
+                              }`}
+                            >
+                              {selected && <Check className="h-3 w-3" />}
+                            </span>
+                          )}
+                          <span className="truncate">{opt.label}</span>
+                        </span>
+                        {!isMulti && selected && <Check className="h-3.5 w-3.5 shrink-0" />}
+                      </button>
+                    </li>
+                  );
+                })
+              )}
+            </ul>
+          </div>,
           document.body
         )}
     </div>

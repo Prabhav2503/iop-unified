@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Rocket, CheckSquare, Plus, Loader2, Calendar, Clock, Key, Trash2, Pencil, Edit2 } from 'lucide-react';
+import { Rocket, CheckSquare, Plus, Loader2, Calendar, Clock, Key, Trash2, Pencil, Edit2, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { changePassword } from '../API/auth';
 import { useInitiatives, useTasks, useTeamDropdown, useCreateTask, useUpdateTask, useDeleteTask } from '../hooks/useQueries';
@@ -96,7 +96,7 @@ const STATUS_CHIP = {
   planning: 'border-line bg-transparent text-ink-muted',
   active: 'border-accent-line bg-accent-soft text-accent-300',
   on_hold: 'border-warn-border bg-warn-soft text-warn-ink',
-  completed: 'border-transparent bg-muted text-ink-faint',
+  completed: 'border-emerald-500/30 bg-emerald-500/15 text-emerald-400 font-semibold',
   closed: 'border-transparent bg-muted text-ink-faint',
 };
 
@@ -734,62 +734,71 @@ export default function Dashboard() {
                   </EmptyNote>
                 ) : (
                   <ul className="divide-y divide-line-subtle">
-                    {upcomingStandaloneTasks.map((tsk) => (
-                      <li key={tsk.id} className="flex items-start justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-body font-medium text-ink">{tsk.title}</p>
+                    {upcomingStandaloneTasks.map((tsk) => {
+                      const isCompleted = (tsk.status || '').toLowerCase() === 'completed';
+                      return (
+                        <li key={tsk.id} className="flex items-start justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-body font-medium ${isCompleted ? 'text-emerald-400' : 'text-ink'}`}>{tsk.title}</p>
 
-                          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-ink-faint">
-                            <span className="inline-flex items-center gap-1.5">
-                              <span
-                                aria-hidden="true"
-                                className={`h-1.5 w-1.5 rounded-full ${
-                                  PRIORITY_DOT[tsk.priority] || PRIORITY_DOT.medium
-                                }`}
-                              />
-                              <span className="capitalize">{tsk.priority || 'medium'}</span>
-                            </span>
-                            <MetaDot />
-                            <span className="capitalize">
-                              {(tsk.status || 'todo').replace('_', ' ')}
-                            </span>
-                            {tsk.deadline && (
-                              <>
-                                <MetaDot />
-                                <span className="inline-flex items-center gap-1.5 tabular-nums">
-                                  <Calendar className="h-3 w-3 shrink-0" aria-hidden="true" />
-                                  Due {formatDate(tsk.deadline)}
+                            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-ink-faint">
+                              <span className="inline-flex items-center gap-1.5">
+                                <span
+                                  aria-hidden="true"
+                                  className={`h-1.5 w-1.5 rounded-full ${
+                                    isCompleted ? 'bg-emerald-400' : (PRIORITY_DOT[tsk.priority] || PRIORITY_DOT.medium)
+                                  }`}
+                                />
+                                <span className="capitalize">{tsk.priority || 'medium'}</span>
+                              </span>
+                              <MetaDot />
+                              {isCompleted ? (
+                                <span className="inline-flex items-center gap-1 rounded-control border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-micro font-semibold capitalize text-emerald-400">
+                                  <Check className="h-3 w-3 text-emerald-400" /> completed
                                 </span>
-                              </>
-                            )}
-                          </p>
-
-                          {tsk.comment && (
-                            <p className="mt-1.5 border-l-2 border-line pl-2.5 text-meta text-ink-faint">
-                              {tsk.comment}
+                              ) : (
+                                <span className="capitalize">
+                                  {(tsk.status || 'todo').replace('_', ' ')}
+                                </span>
+                              )}
+                              {tsk.deadline && (
+                                <>
+                                  <MetaDot />
+                                  <span className="inline-flex items-center gap-1.5 tabular-nums">
+                                    <Calendar className="h-3 w-3 shrink-0" aria-hidden="true" />
+                                    Due {formatDate(tsk.deadline)}
+                                  </span>
+                                </>
+                              )}
                             </p>
-                          )}
-                        </div>
 
-                        {isMyCreator(tsk.creator_id, user) && (
-                          <div className="flex shrink-0 items-center gap-0.5">
-                            <IconButton
-                              label="Edit task"
-                              onClick={() => setEditingTask(tsk)}
-                            >
-                              <Edit2 className="h-3.5 w-3.5" />
-                            </IconButton>
-                            <IconButton
-                              danger
-                              label="Delete task"
-                              onClick={() => handleDeleteTask(tsk.id)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </IconButton>
+                            {tsk.comment && (
+                              <p className="mt-1.5 border-l-2 border-line pl-2.5 text-meta text-ink-faint">
+                                {tsk.comment}
+                              </p>
+                            )}
                           </div>
-                        )}
-                      </li>
-                    ))}
+
+                          {isMyCreator(tsk.creator_id, user) && (
+                            <div className="flex shrink-0 items-center gap-0.5">
+                              <IconButton
+                                label="Edit task"
+                                onClick={() => setEditingTask(tsk)}
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </IconButton>
+                              <IconButton
+                                danger
+                                label="Delete task"
+                                onClick={() => handleDeleteTask(tsk.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </IconButton>
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </Panel>
@@ -831,36 +840,43 @@ export default function Dashboard() {
                 <EmptyNote>No tasks assigned to you yet.</EmptyNote>
               ) : (
                 <ul className="divide-y divide-line-subtle">
-                  {assignedTasks.map((tsk) => (
-                    <li key={tsk.id} className="flex items-start justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-body font-medium text-ink">{tsk.title}</p>
-                          <span className="rounded-control bg-accent-soft px-2 py-0.5 text-micro font-medium capitalize text-accent-300">
-                            {(tsk.status || 'todo').replace('_', ' ')}
-                          </span>
-                        </div>
+                  {assignedTasks.map((tsk) => {
+                    const isCompleted = (tsk.status || '').toLowerCase() === 'completed';
+                    return (
+                      <li key={tsk.id} className="flex items-start justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className={`text-body font-medium ${isCompleted ? 'text-emerald-400' : 'text-ink'}`}>{tsk.title}</p>
+                            <span className={`rounded-control px-2 py-0.5 text-micro font-medium capitalize ${
+                              isCompleted
+                                ? 'inline-flex items-center gap-1 border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 font-semibold'
+                                : 'bg-accent-soft text-accent-300'
+                            }`}>
+                              {isCompleted && <Check className="h-3 w-3 text-emerald-400" />}
+                              {(tsk.status || 'todo').replace('_', ' ')}
+                            </span>
+                          </div>
 
-                        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-ink-faint">
-                          <span className="inline-flex items-center gap-1.5">
-                            <span
-                              aria-hidden="true"
-                              className={`h-1.5 w-1.5 rounded-full ${
-                                PRIORITY_DOT[tsk.priority] || PRIORITY_DOT.medium
-                              }`}
-                            />
-                            <span className="capitalize">{tsk.priority || 'medium'}</span>
-                          </span>
-                          {tsk.deadline && (
-                            <>
-                              <MetaDot />
-                              <span className="inline-flex items-center gap-1.5 tabular-nums">
-                                <Calendar className="h-3 w-3 shrink-0" aria-hidden="true" />
-                                Due {formatDate(tsk.deadline)}
-                              </span>
-                            </>
-                          )}
-                        </p>
+                          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-ink-faint">
+                            <span className="inline-flex items-center gap-1.5">
+                              <span
+                                aria-hidden="true"
+                                className={`h-1.5 w-1.5 rounded-full ${
+                                  isCompleted ? 'bg-emerald-400' : (PRIORITY_DOT[tsk.priority] || PRIORITY_DOT.medium)
+                                }`}
+                              />
+                              <span className="capitalize">{tsk.priority || 'medium'}</span>
+                            </span>
+                            {tsk.deadline && (
+                              <>
+                                <MetaDot />
+                                <span className="inline-flex items-center gap-1.5 tabular-nums">
+                                  <Calendar className="h-3 w-3 shrink-0" aria-hidden="true" />
+                                  Due {formatDate(tsk.deadline)}
+                                </span>
+                              </>
+                            )}
+                          </p>
 
                         {tsk.comment && (
                           <p className="mt-1.5 border-l-2 border-line pl-2.5 text-meta text-ink-faint">
@@ -887,7 +903,7 @@ export default function Dashboard() {
                         </div>
                       )}
                     </li>
-                  ))}
+                  ); })}
                 </ul>
               )}
             </Panel>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus,
   Trash2,
@@ -16,6 +16,7 @@ import {
   Activity,
   Calendar,
   Target,
+  Search,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -164,7 +165,7 @@ const STATUS_CHIP = {
   planning: 'border-line bg-transparent text-ink-muted',
   active: 'border-accent-line bg-accent-soft text-accent-300',
   on_hold: 'border-warn-border bg-warn-soft text-warn-ink',
-  completed: 'border-transparent bg-muted text-ink-faint',
+  completed: 'border-emerald-500/30 bg-emerald-500/15 text-emerald-400 font-semibold',
   closed: 'border-transparent bg-muted text-ink-faint',
 };
 
@@ -174,7 +175,7 @@ const STATUS_TONE = {
   planning: 'neutral',
   active: 'accent',
   on_hold: 'warn',
-  completed: 'neutral',
+  completed: 'success',
   closed: 'neutral',
 };
 
@@ -222,6 +223,21 @@ function StatusChip({ status }) {
 // Team picker. Renders the option list IN NORMAL FLOW rather than absolutely
 // positioned, so it can never be clipped by the modal's scroll container.
 function TeamPicker({ options, selectedIds, onToggle, onRemove, open, setOpen, loading, placeholder }) {
+  const [search, setSearch] = useState('');
+  const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    } else {
+      setSearch('');
+    }
+  }, [open]);
+
+  const filtered = options.filter((tm) =>
+    (tm.name || '').toLowerCase().includes(search.toLowerCase().trim())
+  );
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 rounded-control border border-line bg-canvas px-3 py-2 text-meta text-ink-faint">
@@ -270,29 +286,54 @@ function TeamPicker({ options, selectedIds, onToggle, onRemove, open, setOpen, l
       </div>
 
       {open && (
-        <div className="mt-1 max-h-48 overflow-y-auto rounded-control border border-line bg-canvas">
-          {options.length === 0 ? (
-            <p className="px-3 py-2 text-meta text-ink-faint">No team members found.</p>
-          ) : (
-            options.map((tm) => {
-              const selected = selectedIds.includes(tm.id);
-              return (
-                <button
-                  type="button"
-                  key={tm.id}
-                  onClick={() => onToggle(tm.id)}
-                  className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-body transition-colors duration-150 ${
-                    selected
-                      ? 'bg-accent-soft font-medium text-accent-300'
-                      : 'text-ink-muted hover:bg-muted hover:text-ink'
-                  }`}
-                >
-                  <span className="truncate">{tm.name}</span>
-                  {selected && <Check className="h-4 w-4 shrink-0" />}
-                </button>
-              );
-            })
-          )}
+        <div className="mt-1 max-h-56 overflow-hidden rounded-control border border-line bg-canvas flex flex-col">
+          <div className="relative border-b border-line-subtle p-2 bg-surface">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-faint" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search team members..."
+              className="w-full rounded-control border border-line bg-canvas py-1 pl-8 pr-7 text-meta text-ink placeholder:text-ink-faint focus:border-accent-400 focus:outline-none"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-faint hover:text-ink"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+
+          <div className="max-h-44 overflow-y-auto divide-y divide-line-subtle">
+            {filtered.length === 0 ? (
+              <p className="px-3 py-2.5 text-center text-meta text-ink-faint">
+                {search ? `No team members matching "${search}"` : 'No team members found.'}
+              </p>
+            ) : (
+              filtered.map((tm) => {
+                const selected = selectedIds.includes(tm.id);
+                return (
+                  <button
+                    type="button"
+                    key={tm.id}
+                    onClick={() => onToggle(tm.id)}
+                    className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-body transition-colors duration-150 ${
+                      selected
+                        ? 'bg-accent-soft font-medium text-accent-300'
+                        : 'text-ink-muted hover:bg-muted hover:text-ink'
+                    }`}
+                  >
+                    <span className="truncate">{tm.name}</span>
+                    {selected && <Check className="h-4 w-4 shrink-0" />}
+                  </button>
+                );
+              })
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -1607,45 +1648,55 @@ export default function InitiativesPage() {
                           </p>
                         ) : (
                           <ul className="ml-4 divide-y divide-line-subtle border-l-2 border-line pl-5">
-                            {sortedStageTasks.map((tsk) => (
-                              <li
-                                key={tsk.id}
-                                className="flex items-start justify-between gap-3 py-2.5 first:pt-1 last:pb-1"
-                              >
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-body font-medium text-ink">{tsk.title}</p>
-
-                                  <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-ink-faint">
-                                    <span className="inline-flex items-center gap-1.5">
-                                      <span
-                                        aria-hidden="true"
-                                        className={`h-1.5 w-1.5 rounded-full ${
-                                          PRIORITY_DOT[tsk.priority] || PRIORITY_DOT.medium
-                                        }`}
-                                      />
-                                      <span className="capitalize">
-                                        {tsk.priority || 'medium'}
-                                      </span>
-                                    </span>
-                                    <MetaDot />
-                                    <span className="capitalize">
-                                      {(tsk.status || 'todo').replace('_', ' ')}
-                                    </span>
-                                    {tsk.deadline && (
-                                      <>
-                                        <MetaDot />
-                                        <span className="tabular-nums">
-                                          Due {formatDate(tsk.deadline)}
-                                        </span>
-                                      </>
-                                    )}
-                                  </p>
-                                  {tsk.comment && (
-                                    <p className="mt-1 border-l-2 border-line pl-2 text-meta text-ink-faint">
-                                      {tsk.comment}
+                            {sortedStageTasks.map((tsk) => {
+                              const isCompleted = (tsk.status || '').toLowerCase() === 'completed';
+                              return (
+                                <li
+                                  key={tsk.id}
+                                  className="flex items-start justify-between gap-3 py-2.5 first:pt-1 last:pb-1"
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <p className={`text-body font-medium ${isCompleted ? 'text-emerald-400' : 'text-ink'}`}>
+                                      {tsk.title}
                                     </p>
-                                  )}
-                                </div>
+
+                                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-ink-faint">
+                                      <span className="inline-flex items-center gap-1.5">
+                                        <span
+                                          aria-hidden="true"
+                                          className={`h-1.5 w-1.5 rounded-full ${
+                                            isCompleted ? 'bg-emerald-400' : (PRIORITY_DOT[tsk.priority] || PRIORITY_DOT.medium)
+                                          }`}
+                                        />
+                                        <span className="capitalize">
+                                          {tsk.priority || 'medium'}
+                                        </span>
+                                      </span>
+                                      <MetaDot />
+                                      {isCompleted ? (
+                                        <span className="inline-flex items-center gap-1 rounded-control border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-micro font-semibold capitalize text-emerald-400">
+                                          <Check className="h-3 w-3 text-emerald-400" /> completed
+                                        </span>
+                                      ) : (
+                                        <span className="capitalize">
+                                          {(tsk.status || 'todo').replace('_', ' ')}
+                                        </span>
+                                      )}
+                                      {tsk.deadline && (
+                                        <>
+                                          <MetaDot />
+                                          <span className="tabular-nums">
+                                            Due {formatDate(tsk.deadline)}
+                                          </span>
+                                        </>
+                                      )}
+                                    </p>
+                                    {tsk.comment && (
+                                      <p className="mt-1 border-l-2 border-line pl-2 text-meta text-ink-faint">
+                                        {tsk.comment}
+                                      </p>
+                                    )}
+                                  </div>
 
                                 {!isPassed && (isMyCreator(tsk.creator_id, user) || privileged) && (
                                   <div className="flex shrink-0 items-center gap-0.5">
@@ -1669,8 +1720,9 @@ export default function InitiativesPage() {
                                   </div>
                                 )}
                               </li>
-                            ))}
-                          </ul>
+                            );
+                          })}
+                        </ul>
                         )}
                       </div>
                     );
