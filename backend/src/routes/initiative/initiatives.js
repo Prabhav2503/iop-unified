@@ -100,6 +100,7 @@ router.patch("/:id", initiativeIdValidator, initiativeUpdateValidator, async (re
     if (req.body.impact !== undefined) payload.impact = req.body.impact;
     if (req.body.deadline !== undefined) payload.deadline = req.body.deadline;
     if (req.body.status !== undefined) payload.status = req.body.status;
+    if (req.body.whatsapp_link !== undefined) payload.whatsapp_link = req.body.whatsapp_link;
 
     const { data, error } = await supabase
       .from("initiatives")

@@ -86,9 +86,9 @@ export const getInitiativeById = async (id) => {
 };
 
 // POST /api/initiatives
-// Body: { name, description, impact, deadline, status }
+// Body: { name, description, impact, deadline, status, whatsapp_link, created_by }
 // Returns: { data: Initiative } | { error: string }
-export const createInitiative = async ({ name, description, impact, deadline, status, creator_id }) => {
+export const createInitiative = async ({ name, description, impact, deadline, status, whatsapp_link, creator_id }) => {
     
     if (!name) {
         return { error: "Initiative name is required" };
@@ -101,7 +101,15 @@ export const createInitiative = async ({ name, description, impact, deadline, st
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ name, description, impact, deadline, status, created_by:creator_id })
+            body: JSON.stringify({
+                name,
+                description,
+                impact,
+                deadline,
+                status,
+                whatsapp_link: whatsapp_link ?? null,
+                created_by: creator_id
+            })
         });
 
         const json = await response.json().catch(() => null);
@@ -117,7 +125,7 @@ export const createInitiative = async ({ name, description, impact, deadline, st
 };
 
 // PATCH /api/initiatives/:id
-// Body (all optional): { name, description, impact, deadline, status }
+// Body (all optional): { name, description, impact, deadline, status, whatsapp_link }
 // Returns: { data: Initiative } | { error: string }
 export const updateInitiative = async (id, updates) => {
     if (!id) {
@@ -130,6 +138,8 @@ export const updateInitiative = async (id, updates) => {
     if (updates.impact !== undefined) payload.impact = updates.impact;
     if (updates.deadline !== undefined) payload.deadline = updates.deadline;
     if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.whatsapp_link !== undefined) payload.whatsapp_link = updates.whatsapp_link;
+    if (updates.whatsappLink !== undefined) payload.whatsapp_link = updates.whatsappLink;
 
     try {
         const response = await fetch(`${BASE}/${id}`, {

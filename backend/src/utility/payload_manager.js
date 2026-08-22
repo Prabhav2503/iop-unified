@@ -39,6 +39,7 @@ export const mapInitiativePayload = (body, userId) => ({
 	impact: body.impact ?? null,
 	deadline: body.deadline ?? null,
 	status: body.status ?? null,
+	whatsapp_link: body.whatsapp_link ?? body.whatsappLink ?? null,
 	created_by: userId,
 });
 

@@ -7,6 +7,7 @@ export const initiativeCreateValidator = [
   body("description").optional({ nullable: true }).isString(),
   body("impact").optional({ nullable: true }).isString(),
   body("deadline").optional({ nullable: true }).isISO8601().toDate().withMessage("Deadline must be a valid date"),
+  body("whatsapp_link").optional({ nullable: true }).isString(),
 ];
 
 export const initiativeTeamValidator = [
@@ -54,4 +55,5 @@ export const initiativeUpdateValidator = [
   body("impact").optional({ nullable: true }).isString(),
   body("deadline").optional({ nullable: true }),
   body("status").optional().isString(),
+  body("whatsapp_link").optional({ nullable: true }).isString(),
 ];

@@ -26,6 +26,7 @@ import {
 import {
   getAllInitiatives,
   createInitiative,
+  updateInitiative,
   deleteInitiative,
 } from '../API/initiative';
 import {
@@ -119,6 +120,26 @@ function formatDate(value) {
     day: '2-digit',
     month: 'short',
   });
+}
+
+function formatUrl(url) {
+  if (!url) return '';
+  const trimmed = url.trim();
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+function WhatsAppIcon({ className = 'h-4 w-4', ...props }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+    </svg>
+  );
 }
 
 // Completion, derived purely from tasks already in state. No extra fetching.
@@ -285,6 +306,7 @@ function AddInitiativeModal({ onClose, onSuccess }) {
   const [impact, setImpact] = useState('');
   const [deadline, setDeadline] = useState('');
   const [status, setStatus] = useState('planning');
+  const [whatsappLink, setWhatsappLink] = useState('');
   const [selectedTeamIds, setSelectedTeamIds] = useState([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -321,6 +343,7 @@ function AddInitiativeModal({ onClose, onSuccess }) {
       impact: impact.trim() || null,
       deadline: deadline || null,
       status: status,
+      whatsapp_link: whatsappLink.trim() || null,
       creator_id: user.profile_id,
     });
 
@@ -407,6 +430,16 @@ function AddInitiativeModal({ onClose, onSuccess }) {
         </Field>
       </div>
 
+      <Field label="WhatsApp group link">
+        <input
+          type="url"
+          value={whatsappLink}
+          onChange={(e) => setWhatsappLink(e.target.value)}
+          placeholder="e.g. https://chat.whatsapp.com/..."
+          className={INPUT_CLS}
+        />
+      </Field>
+
       <Field label="Assignees">
         <TeamPicker
           options={teamOptions}
@@ -417,6 +450,126 @@ function AddInitiativeModal({ onClose, onSuccess }) {
           setOpen={setDropdownOpen}
           loading={teamsLoading}
           placeholder="Select team members..."
+        />
+      </Field>
+
+      <FormError>{error}</FormError>
+    </Modal>
+  );
+}
+
+// ─── Modal 1b: Edit Initiative ──────────────────────────────────────────────
+
+function EditInitiativeModal({ initiative, onClose, onSuccess }) {
+  const [name, setName] = useState(initiative?.name || '');
+  const [description, setDescription] = useState(initiative?.description || '');
+  const [impact, setImpact] = useState(initiative?.impact || '');
+  const [deadline, setDeadline] = useState(
+    initiative?.deadline ? new Date(initiative.deadline).toISOString().split('T')[0] : ''
+  );
+  const [status, setStatus] = useState(initiative?.status || 'planning');
+  const [whatsappLink, setWhatsappLink] = useState(initiative?.whatsapp_link || '');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setError('');
+    setSubmitting(true);
+
+    const updates = {
+      name: name.trim(),
+      description: description.trim() || null,
+      impact: impact.trim() || null,
+      deadline: deadline || null,
+      status,
+      whatsapp_link: whatsappLink.trim() || null,
+    };
+
+    const res = await updateInitiative(initiative.id, updates);
+    setSubmitting(false);
+
+    if (res.error) {
+      setError(res.error);
+    } else {
+      onSuccess(res.data || { ...initiative, ...updates });
+    }
+  };
+
+  return (
+    <Modal
+      title="Edit initiative"
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      footer={
+        <>
+          <CancelButton onClose={onClose} />
+          <button type="submit" disabled={submitting} className={BTN_PRIMARY}>
+            {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {submitting ? 'Saving...' : 'Save changes'}
+          </button>
+        </>
+      }
+    >
+      <Field label="Initiative name *">
+        <input
+          required
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className={INPUT_CLS}
+        />
+      </Field>
+
+      <Field label="Description">
+        <textarea
+          rows={3}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Brief summary of initiative objectives..."
+          className={INPUT_CLS}
+        />
+      </Field>
+
+      <Field label="Expected impact">
+        <input
+          type="text"
+          value={impact}
+          onChange={(e) => setImpact(e.target.value)}
+          placeholder="e.g. Engage 50+ startups and 1000+ students"
+          className={INPUT_CLS}
+        />
+      </Field>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Status *">
+          <Select
+            value={status}
+            onChange={setStatus}
+            options={INITIATIVE_STATUS_OPTIONS}
+            ariaLabel="Status"
+            variant="field"
+          />
+        </Field>
+
+        <Field label="Deadline">
+          <input
+            type="date"
+            value={deadline}
+            onChange={(e) => setDeadline(e.target.value)}
+            className={INPUT_CLS}
+          />
+        </Field>
+      </div>
+
+      <Field label="WhatsApp group link">
+        <input
+          type="url"
+          value={whatsappLink}
+          onChange={(e) => setWhatsappLink(e.target.value)}
+          placeholder="e.g. https://chat.whatsapp.com/..."
+          className={INPUT_CLS}
         />
       </Field>
 
@@ -925,6 +1078,9 @@ export default function InitiativesPage() {
   // Editing Task target state
   const [editingTask, setEditingTask] = useState(null);
 
+  // Editing Initiative target state
+  const [editingInitiative, setEditingInitiative] = useState(null);
+
   const [deletingId, setDeletingId] = useState(null);
 
   const fetchData = useCallback(async () => {
@@ -1082,6 +1238,7 @@ export default function InitiativesPage() {
     const progress = taskProgress(initiativeTasks);
     const isPassed = isDeadlinePassed(init.deadline);
     const canDeleteInitiative = isMyCreator(init.created_by, user) || privileged;
+    const canEditInitiative = isMyCreator(init.created_by, user) || privileged;
 
     return (
       <article
@@ -1137,6 +1294,20 @@ export default function InitiativesPage() {
                     <span className="truncate">{init.impact}</span>
                   </span>
                 )}
+
+                {init.whatsapp_link && (
+                  <a
+                    href={formatUrl(init.whatsapp_link)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1.5 font-medium text-emerald-500 transition-colors duration-150 hover:text-emerald-400 hover:underline"
+                    title="Open WhatsApp group"
+                  >
+                    <WhatsAppIcon className="h-3 w-3 shrink-0" />
+                    <span>WhatsApp</span>
+                  </a>
+                )}
               </div>
 
               {progress && (
@@ -1156,20 +1327,48 @@ export default function InitiativesPage() {
             />
           </button>
 
-          {canDeleteInitiative && (
-            <IconButton
-              danger
-              disabled={isDeleting}
-              label="Delete initiative"
-              onClick={(e) => handleDeleteInitiative(e, init.id)}
-            >
-              {isDeleting ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
-            </IconButton>
-          )}
+          <div className="flex shrink-0 items-center gap-1">
+            {init.whatsapp_link && (
+              <a
+                href={formatUrl(init.whatsapp_link)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                title="Open WhatsApp group"
+                aria-label="Open WhatsApp group"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control text-emerald-500 transition duration-150 ease-exit hover:bg-emerald-500/10 hover:text-emerald-400 active:scale-90"
+              >
+                <WhatsAppIcon className="h-4 w-4" />
+              </a>
+            )}
+
+            {canEditInitiative && (
+              <IconButton
+                label="Edit initiative"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditingInitiative(init);
+                }}
+              >
+                <Edit2 className="h-3.5 w-3.5" />
+              </IconButton>
+            )}
+
+            {canDeleteInitiative && (
+              <IconButton
+                danger
+                disabled={isDeleting}
+                label="Delete initiative"
+                onClick={(e) => handleDeleteInitiative(e, init.id)}
+              >
+                {isDeleting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+              </IconButton>
+            )}
+          </div>
         </div>
 
         {/* Expanding rises in; collapsing cuts. Animating the collapse would
@@ -1400,6 +1599,19 @@ export default function InitiativesPage() {
           onSuccess={(created) => {
             setShowAddInitiativeModal(false);
             if (created) setInitiatives((prev) => [created, ...prev]);
+          }}
+        />
+      )}
+
+      {editingInitiative && (
+        <EditInitiativeModal
+          initiative={editingInitiative}
+          onClose={() => setEditingInitiative(null)}
+          onSuccess={(updatedInit) => {
+            setEditingInitiative(null);
+            setInitiatives((prev) =>
+              prev.map((i) => (i.id === updatedInit.id ? { ...i, ...updatedInit } : i))
+            );
           }}
         />
       )}
