@@ -3,6 +3,53 @@
 
 const BASE = `/api/tasks`;
 
+export const getTaskAssigneeIds = (taskOrAssignees) => {
+    if (taskOrAssignees == null || taskOrAssignees === '') return [];
+
+    const fromValue = (value) => {
+        if (value == null || value === '') return [];
+        const list = Array.isArray(value) ? value : [value];
+        const ids = [];
+        const seen = new Set();
+
+        for (const item of list) {
+            const raw =
+                item && typeof item === 'object'
+                    ? item.team_id || item.id || item.profile_id
+                    : item;
+            const id = String(raw ?? '').trim();
+            if (!id || id === 'undefined' || id === 'null') continue;
+            const key = id.toLowerCase();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            ids.push(id);
+        }
+
+        return ids;
+    };
+
+    if (Array.isArray(taskOrAssignees) || typeof taskOrAssignees !== 'object') {
+        return fromValue(taskOrAssignees);
+    }
+
+    const direct = taskOrAssignees.assignees;
+    if (Array.isArray(direct)) {
+        const looksLikeIds =
+            direct.length === 0 ||
+            typeof direct[0] !== 'object' ||
+            direct[0] == null;
+        if (looksLikeIds) return fromValue(direct);
+    } else if (typeof direct === 'string' && direct) {
+        return fromValue(direct);
+    }
+
+    if (Array.isArray(taskOrAssignees.task_assignees)) {
+        return fromValue(taskOrAssignees.task_assignees);
+    }
+
+    return fromValue(direct);
+};
+
 // GET /api/tasks/all
 // Returns: { data: Task[] } | { error: string }
 export const getAllTasks = async () => {
