@@ -3,7 +3,7 @@ import { validationResult } from "express-validator";
 import supabase from "../utility/supabase.js";
 import { loginClientValidator, changePasswordValidator } from "../validator/auth.js";
 import dotenv from "dotenv";
-import { tokengenerator } from "../utility/helper.js";
+import { tokengenerator, verifytoken } from "../utility/helper.js";
 dotenv.config();
 
 const router = express.Router();
@@ -83,6 +83,23 @@ router.post("/logout", (req, res) => {
   });
 });
 
+
+router.get("/me", async (req, res) => {
+  const token = req.cookies.token ? req.cookies.token : req.headers['token'];
+  if (!token) {
+    return res.status(401).json({ message: "Unauthorized: No token provided" });
+  }
+
+  try {
+    const decoded = await verifytoken(token);
+    if (!decoded) {
+      return res.status(401).json({ message: "Unauthorized: Invalid token" });
+    }
+    return res.status(200).json({ data: decoded });
+  } catch (err) {
+    return res.status(401).json({ message: "Unauthorized: Invalid token", error: err.message });
+  }
+});
 
 router.put("/update-password",changePasswordValidator,  async (req, res) => {
   const current = req.body.currentPassword;  

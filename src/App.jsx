@@ -16,7 +16,15 @@ import DatabasePage from './pages/database';
 import ResourcesPage from './pages/resources';
 
 function ProtectedRoute({ children }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, authLoading } = useAuth();
+
+  if (authLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-canvas text-ink-muted">
+        Loading...
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
