@@ -1567,7 +1567,7 @@ export default function InitiativesPage() {
                   </span>
                 </div>
 
-                {!isPassed && canEdit && (
+                {!isPassed && (isMyCreator(init.created_by, user) || canEdit) && (
                   <button
                     type="button"
                     onClick={() => setShowEditTeamModalFor(init.id)}
