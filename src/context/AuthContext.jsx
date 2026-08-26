@@ -1,9 +1,29 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const response = await fetch('/api/me', { credentials: 'include' });
+        if (!response.ok) {
+          throw new Error('Not authenticated');
+        }
+        const json = await response.json();
+        setUser(json.data);
+      } catch {
+        setUser(null);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    checkSession();
+  }, []);
 
   const login = (userData) => {
     setUser(userData);
@@ -17,10 +37,11 @@ export function AuthProvider({ children }) {
     () => ({
       user,
       isAuthenticated: Boolean(user),
+      authLoading,
       login,
       logout,
     }),
-    [user]
+    [user, authLoading]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
