@@ -472,17 +472,24 @@ export function Select({
     };
   }, [isOpen, place, closeList]);
 
+  const multiValues = isMulti
+    ? Array.isArray(value)
+      ? value
+      : value != null && value !== ''
+        ? [value]
+        : []
+    : [];
+
   // Compute label text to show on the trigger button
   let triggerLabel = '';
   if (isMulti) {
-    const selectedArr = Array.isArray(value) ? value : [];
-    if (selectedArr.length === 0) {
+    if (multiValues.length === 0) {
       triggerLabel = placeholder;
-    } else if (selectedArr.length === 1) {
-      const match = options.find((o) => String(o.value) === String(selectedArr[0]));
-      triggerLabel = match ? match.label : `${selectedArr.length} selected`;
+    } else if (multiValues.length === 1) {
+      const match = options.find((o) => String(o.value) === String(multiValues[0]));
+      triggerLabel = match ? match.label : `${multiValues.length} selected`;
     } else {
-      triggerLabel = `${selectedArr.length} selected`;
+      triggerLabel = `${multiValues.length} selected`;
     }
   } else {
     const current =
@@ -498,18 +505,17 @@ export function Select({
 
   const handleOptionClick = (optValue) => {
     if (isMulti) {
-      const currentArr = Array.isArray(value) ? value : [];
       let newArr;
       if (!optValue) {
         // "Unassigned" option clicked -> reset to empty array
         newArr = [];
       } else {
         const valStr = String(optValue);
-        const exists = currentArr.some((v) => String(v) === valStr);
+        const exists = multiValues.some((v) => String(v) === valStr);
         if (exists) {
-          newArr = currentArr.filter((v) => String(v) !== valStr);
+          newArr = multiValues.filter((v) => String(v) !== valStr);
         } else {
-          newArr = [...currentArr, optValue];
+          newArr = [...multiValues, optValue];
         }
       }
       onChange(newArr);
@@ -522,9 +528,8 @@ export function Select({
 
   const isOptionSelected = (optValue) => {
     if (isMulti) {
-      const currentArr = Array.isArray(value) ? value : [];
-      if (!optValue) return currentArr.length === 0;
-      return currentArr.some((v) => String(v) === String(optValue));
+      if (!optValue) return multiValues.length === 0;
+      return multiValues.some((v) => String(v) === String(optValue));
     }
     return String(optValue ?? '') === String(value ?? '');
   };

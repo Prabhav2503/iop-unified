@@ -21,6 +21,29 @@ export const stageCreateValidator = [
   body("name").trim().notEmpty().withMessage("Stage name is required").isString(),
 ];
 
+const sanitizeAssignees = (value) => {
+  if (value === undefined) return undefined;
+  if (value == null || value === "") return [];
+  const list = Array.isArray(value) ? value : [value];
+  const ids = [];
+  const seen = new Set();
+
+  for (const item of list) {
+    const raw =
+      item && typeof item === "object"
+        ? item.team_id || item.id || item.profile_id
+        : item;
+    const id = String(raw ?? "").trim();
+    if (!id) continue;
+    const key = id.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    ids.push(id);
+  }
+
+  return ids;
+};
+
 export const taskCreateValidator = [
   body("title").trim().notEmpty().withMessage("Title is required").isString(),
   body("creator_id").isUUID().withMessage("Creator ID must be a valid UUID"),
@@ -29,7 +52,10 @@ export const taskCreateValidator = [
   body("priority").optional().isString().withMessage("Priority must be a string"),
   body("status").optional().isString().withMessage("Status must be a string"),
   body("deadline").optional({ nullable: true }),
-  body("assignees").isArray().withMessage("Assignees must be an array of UUIDs"),
+  body("assignees")
+    .customSanitizer((value) => sanitizeAssignees(value) ?? [])
+    .isArray()
+    .withMessage("Assignees must be an array of UUIDs"),
   body("assignees.*").isUUID().withMessage("Each assignee must be a valid UUID"),
 ];
 
@@ -39,6 +65,12 @@ export const taskUpdateValidator = [
   body("status").optional().isString().withMessage("Status must be a string"),
   body("priority").optional().isString().withMessage("Priority must be a string"),
   body("stage_id").optional().isUUID().withMessage("Stage ID must be a valid UUID"),
+  body("assignees")
+    .optional()
+    .customSanitizer(sanitizeAssignees)
+    .isArray()
+    .withMessage("Assignees must be an array of UUIDs"),
+  body("assignees.*").isUUID().withMessage("Each assignee must be a valid UUID"),
 ];
 
 export const initiativeIdValidator = [

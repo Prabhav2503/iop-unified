@@ -60,3 +60,33 @@ export const mapTaskUpdatePayload = (body) => {
 	if (body.priority !== undefined) payload.priority = body.priority;
 	return payload;
 };
+
+export const normalizeAssigneeIds = (value) => {
+	if (value == null || value === "") return [];
+	const list = Array.isArray(value) ? value : [value];
+	const ids = [];
+	const seen = new Set();
+
+	for (const item of list) {
+		const raw =
+			item && typeof item === "object"
+				? item.team_id || item.id || item.profile_id
+				: item;
+		const id = String(raw ?? "").trim();
+		if (!id) continue;
+		const key = id.toLowerCase();
+		if (seen.has(key)) continue;
+		seen.add(key);
+		ids.push(id);
+	}
+
+	return ids;
+};
+
+export const shapeTask = (task) => {
+	if (!task) return task;
+	return {
+		...task,
+		assignees: normalizeAssigneeIds(task.task_assignees),
+	};
+};

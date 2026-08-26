@@ -48,6 +48,7 @@ import {
   updateTask,
   deleteTask,
   getTasksByStage,
+  getTaskAssigneeIds,
 } from '../API/task';
 import { getTeamDropdown } from '../API/team';
 import {
@@ -809,7 +810,7 @@ function AddTaskModal({ initiativeId, stageId, stageName, onClose, onSuccess }) 
       status,
       deadline: deadline || null,
       comment: comment.trim() || null,
-      assignees: selectedAssignees,
+      assignees: getTaskAssigneeIds(selectedAssignees),
     };
 
     const res = await createTask(taskPayload);
@@ -939,11 +940,7 @@ function EditTaskModal({ task, onClose, onSuccess }) {
     task.deadline ? new Date(task.deadline).toISOString().split('T')[0] : ''
   );
   const [comment, setComment] = useState(task.comment || '');
-  const initialAssignees =
-    task.assignees ||
-    (task.task_assignees?.map((a) => a.team_id || a.id || a).filter(Boolean)) ||
-    [];
-  const [selectedAssignees, setSelectedAssignees] = useState(initialAssignees);
+  const [selectedAssignees, setSelectedAssignees] = useState(getTaskAssigneeIds(task));
 
   const [teamOptions, setTeamOptions] = useState([]);
   const [teamsLoading, setTeamsLoading] = useState(true);
@@ -970,7 +967,7 @@ function EditTaskModal({ task, onClose, onSuccess }) {
       status,
       deadline: deadline || null,
       comment: comment.trim() || null,
-      assignees: selectedAssignees,
+      assignees: getTaskAssigneeIds(selectedAssignees),
     };
 
     const res = await updateTask(task.id, updates);
@@ -979,7 +976,8 @@ function EditTaskModal({ task, onClose, onSuccess }) {
     if (res.error) {
       setError(res.error);
     } else {
-      onSuccess({ ...task, ...updates });
+      const assignees = getTaskAssigneeIds(res.data || updates);
+      onSuccess({ ...task, ...updates, ...(res.data || {}), assignees });
     }
   };
 
@@ -1144,7 +1142,7 @@ export default function InitiativesPage() {
         .map((t) => ({
           ...t,
           stage_id: t.stage_id || t.stage_tasks?.[0]?.stage_id || null,
-          assignees: t.assignees || t.task_assignees?.map((a) => a.team_id) || [],
+          assignees: getTaskAssigneeIds(t),
         }));
       setTasks(normalizedTasks);
 
@@ -1184,7 +1182,7 @@ export default function InitiativesPage() {
           .map((t) => ({
             ...t,
             stage_id: t.stage_id || t.stage_tasks?.[0]?.stage_id || null,
-            assignees: t.assignees || t.task_assignees?.map((a) => a.team_id) || [],
+            assignees: getTaskAssigneeIds(t),
           }));
 
         setTasks((prev) => {
@@ -1821,7 +1819,14 @@ export default function InitiativesPage() {
           onClose={() => setEditingTask(null)}
           onSuccess={(updatedTask) => {
             setEditingTask(null);
-            setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
+            const assignees = getTaskAssigneeIds(updatedTask);
+            setTasks((prev) =>
+              prev.map((t) =>
+                t.id === updatedTask.id
+                  ? { ...updatedTask, assignees, task_assignees: assignees.map((team_id) => ({ team_id })) }
+                  : t
+              )
+            );
           }}
         />
       )}

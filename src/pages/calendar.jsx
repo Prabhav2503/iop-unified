@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useInitiatives, useTasks, useTeamDropdown, useDeleteTask, useCreateTask } from '../hooks/useQueries';
+import { getTaskAssigneeIds } from '../API/task';
 import {
   BTN_PRIMARY,
   BTN_QUIET,
@@ -121,21 +122,13 @@ function getPossibleUserIds(user) {
 function isAssignedToMe(task, user) {
   if (!task || !user) return false;
   const myIds = getPossibleUserIds(user);
-  const assignees = [
-    ...(task.assignees || []),
-    ...(task.task_assignees || []).map((a) => a.team_id || a.id),
-  ]
-    .filter(Boolean)
-    .map((id) => String(id).toLowerCase().trim());
+  const assignees = getTaskAssigneeIds(task).map((id) => String(id).toLowerCase().trim());
   return assignees.some((id) => myIds.includes(id));
 }
 
 function getAssigneeNames(task, teamMap) {
   if (!task) return [];
-  const ids = [
-    ...(task.assignees || []),
-    ...(task.task_assignees || []).map((a) => a.team_id || a.id),
-  ].filter(Boolean).map((id) => String(id));
+  const ids = getTaskAssigneeIds(task);
   return ids.map((id) => teamMap[id]?.name || `#${id}`);
 }
 
@@ -197,7 +190,7 @@ function AddTaskModal({ onClose, onSuccess, initiatives, teamOptions }) {
       priority,
       status,
       deadline: deadline || null,
-      assignees: selectedAssignees,
+      assignees: getTaskAssigneeIds(selectedAssignees),
     }, {
       onSuccess: () => {
         onSuccess();

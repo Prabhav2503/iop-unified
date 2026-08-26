@@ -3,6 +3,7 @@ import { Rocket, CheckSquare, Plus, Loader2, Calendar, Clock, Key, Trash2, Penci
 import { useAuth } from '../context/AuthContext';
 import { changePassword } from '../API/auth';
 import { useInitiatives, useTasks, useTeamDropdown, useCreateTask, useUpdateTask, useDeleteTask } from '../hooks/useQueries';
+import { getTaskAssigneeIds } from '../API/task';
 import EditProfileModal from '../components/EditProfileModal';
 import {
   INPUT_CLS,
@@ -48,14 +49,7 @@ function isMyCreator(creatorId, user) {
 function isUserAssigned(task, user) {
   if (!task || !user) return false;
   const userIds = getPossibleUserIds(user);
-
-  const assigneesList = [
-    ...(task.assignees || []),
-    ...(task.task_assignees || []).map((a) => a.team_id || a.id),
-  ]
-    .filter(Boolean)
-    .map((id) => String(id).toLowerCase().trim());
-
+  const assigneesList = getTaskAssigneeIds(task).map((id) => String(id).toLowerCase().trim());
   return assigneesList.some((aId) => userIds.includes(aId));
 }
 
@@ -179,7 +173,7 @@ function AddDashboardTaskModal({ onClose, onSuccess }) {
       status,
       deadline: deadline || null,
       comment: comment.trim() || null,
-      assignees: selectedAssignees,
+      assignees: getTaskAssigneeIds(selectedAssignees),
     };
 
     createTaskMutation.mutate(taskPayload, {
@@ -303,11 +297,7 @@ function EditDashboardTaskModal({ task, onClose, onSuccess }) {
     task?.deadline ? new Date(task.deadline).toISOString().split('T')[0] : ''
   );
   const [comment, setComment] = useState(task?.comment || '');
-  const initialAssignees =
-    task?.assignees ||
-    (task?.task_assignees?.map((a) => a.team_id || a.id || a).filter(Boolean)) ||
-    [];
-  const [selectedAssignees, setSelectedAssignees] = useState(initialAssignees);
+  const [selectedAssignees, setSelectedAssignees] = useState(getTaskAssigneeIds(task));
   const [error, setError] = useState('');
 
   const { data: teamOptions = [], isLoading: teamsLoading } = useTeamDropdown();
@@ -324,7 +314,7 @@ function EditDashboardTaskModal({ task, onClose, onSuccess }) {
       status,
       deadline: deadline || null,
       comment: comment.trim() || null,
-      assignees: selectedAssignees,
+      assignees: getTaskAssigneeIds(selectedAssignees),
     };
 
     updateTaskMutation.mutate(
