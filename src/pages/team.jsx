@@ -12,6 +12,7 @@ import {
   partitionTopMembers,
   sortMembersByHierarchy,
 } from '../utility/teamFilters';
+import { getRoleStr, editPrivilegedRole, addPrivilegedRole } from '../utility/permissions';
 import {
   FOCUS,
   BTN_PRIMARY,
@@ -29,10 +30,6 @@ import { useFilterReplay } from '../hooks/useFilterReplay';
 
 // ─── Role helpers ──────────────────────────────────────────────────────────
 
-function getRoleStr(role) {
-  return (Array.isArray(role) ? role.join(' ') : role || '').toLowerCase();
-}
-
 function getRoleDisplay(role) {
   const s = getRoleStr(role);
   if (s.includes('co_overall_coordinator') || s.includes('co overall')) return 'Co-Overall Coordinator';
@@ -41,17 +38,6 @@ function getRoleDisplay(role) {
   if (s.includes('executive')) return 'Executive';
   if (s.includes('admin')) return 'Admin';
   return (Array.isArray(role) ? role[0] : role) || 'Team Member';
-}
-
-function isPrivilegedRole(user) {
-  if (!user) return false;
-  const r = getRoleStr(user.role);
-  return (
-    r.includes('admin') ||
-    r.includes('overall_coordinator') ||
-    r.includes('co_overall_coordinator') ||
-    r.includes('coordinator')
-  );
 }
 
 function isLeadership(role) {
@@ -67,7 +53,8 @@ function roleTone(role) {
 
 export default function Team() {
   const { user } = useAuth();
-  const privileged = isPrivilegedRole(user);
+  const canEdit = editPrivilegedRole(user);
+  const canAdd = addPrivilegedRole(user);
 
   const { data: teamMembers = [], isLoading: loading, error: queryError } = useTeamMembers();
   const deleteTeamMemberMutation = useDeleteTeamMember();
@@ -135,7 +122,7 @@ export default function Team() {
           <ChevronRight className="h-4 w-4 shrink-0 text-ink-faint group-hover:text-ink transition-colors" aria-hidden="true" />
         </button>
 
-        {privileged && (
+        {canEdit && (
           <IconButton
             danger
             disabled={isDeleting}
@@ -194,7 +181,7 @@ export default function Team() {
           title="Team"
           description="Everyone in the cell, grouped by vertical."
           action={
-            privileged && (
+            canAdd && (
               <button onClick={() => setShowAddModal(true)} className={BTN_PRIMARY}>
                 <Plus className="h-4 w-4" />
                 Add member

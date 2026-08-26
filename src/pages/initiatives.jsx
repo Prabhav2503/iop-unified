@@ -75,23 +75,9 @@ import {
   EmptyPanel,
 } from '../components/ui';
 import { useFilterReplay } from '../hooks/useFilterReplay';
+import { getRoleStr, editPrivilegedRole, addPrivilegedRole } from '../utility/permissions';
 
 // ─── Helpers & Constants ───────────────────────────────────────────────────
-
-function getRoleStr(role) {
-  return (Array.isArray(role) ? role.join(' ') : role || '').toLowerCase();
-}
-
-function isPrivilegedRole(user) {
-  if (!user) return false;
-  const r = getRoleStr(user.role);
-  return (
-    r.includes('admin') ||
-    r.includes('overall_coordinator') ||
-    r.includes('co_overall_coordinator') ||
-    r.includes('coordinator')
-  );
-}
 
 const PRIORITY_RANK = {
   urgent: 4,
@@ -627,6 +613,8 @@ function EditInitiativeModal({ initiative, onClose, onSuccess }) {
 function EditInitiativeTeamModal({ initiativeId, currentTeamIds, onClose, onSuccess }) {
   const [selectedIds, setSelectedIds] = useState(currentTeamIds || []);
   const [allTeams, setAllTeams] = useState([]);
+  const [search, setSearch] = useState('');
+  const searchInputRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -667,6 +655,15 @@ function EditInitiativeTeamModal({ initiativeId, currentTeamIds, onClose, onSucc
     }
   };
 
+  const filteredTeams = allTeams.filter((tm) => {
+    const term = search.toLowerCase().trim();
+    if (!term) return true;
+    const nameMatch = (tm.name || '').toLowerCase().includes(term);
+    const roleStr = Array.isArray(tm.role) ? tm.role.join(' ') : (tm.role || '');
+    const roleMatch = roleStr.toLowerCase().includes(term);
+    return nameMatch || roleMatch;
+  });
+
   return (
     <Modal
       title="Assigned team"
@@ -689,26 +686,62 @@ function EditInitiativeTeamModal({ initiativeId, currentTeamIds, onClose, onSucc
           <Loader2 className="h-4 w-4 animate-spin" /> Loading team list...
         </div>
       ) : (
-        <div className="divide-y divide-line-subtle rounded-control border border-line">
-          {allTeams.map((tm) => {
-            const isSelected = selectedIds.includes(tm.id);
-            return (
-              <label
-                key={tm.id}
-                className={`flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5 text-body transition-colors duration-150 ${
-                  isSelected ? 'bg-accent-soft font-medium text-accent-300' : 'text-ink-muted hover:bg-muted'
-                }`}
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-faint" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search team members..."
+              className="w-full rounded-control border border-line bg-canvas py-1.5 pl-8 pr-7 text-meta text-ink placeholder:text-ink-faint focus:border-accent-400 focus:outline-none"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-faint hover:text-ink"
               >
-                <span className="truncate">{tm.name}</span>
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => toggle(tm.id)}
-                  className="h-4 w-4 shrink-0 rounded border-line accent-accent-300"
-                />
-              </label>
-            );
-          })}
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="max-h-64 overflow-y-auto divide-y divide-line-subtle rounded-control border border-line">
+            {filteredTeams.length === 0 ? (
+              <div className="px-3 py-4 text-center text-meta text-ink-faint">
+                {search ? `No team members matching "${search}"` : 'No team members found.'}
+              </div>
+            ) : (
+              filteredTeams.map((tm) => {
+                const isSelected = selectedIds.includes(tm.id);
+                return (
+                  <label
+                    key={tm.id}
+                    className={`flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5 text-body transition-colors duration-150 ${
+                      isSelected ? 'bg-accent-soft font-medium text-accent-300' : 'text-ink-muted hover:bg-muted'
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium">{tm.name}</div>
+                      {tm.role && (
+                        <div className="truncate text-micro text-ink-faint">
+                          {Array.isArray(tm.role) ? tm.role.join(', ') : tm.role}
+                        </div>
+                      )}
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggle(tm.id)}
+                      className="h-4 w-4 shrink-0 rounded border-line accent-accent-300"
+                    />
+                  </label>
+                );
+              })
+            )}
+          </div>
         </div>
       )}
       <FormError>{error}</FormError>
@@ -1090,7 +1123,8 @@ function EditTaskModal({ task, onClose, onSuccess }) {
 
 export default function InitiativesPage() {
   const { user } = useAuth();
-  const privileged = isPrivilegedRole(user);
+  const canEdit = editPrivilegedRole(user);
+  const canAdd = addPrivilegedRole(user);
 
   const [initiatives, setInitiatives] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -1275,8 +1309,8 @@ export default function InitiativesPage() {
     const initiativeTasks = tasks.filter((t) => t.initiative_id === init.id);
     const progress = taskProgress(initiativeTasks);
     const isPassed = isDeadlinePassed(init.deadline);
-    const canDeleteInitiative = isMyCreator(init.created_by, user) || privileged;
-    const canEditInitiative = isMyCreator(init.created_by, user) || privileged;
+    const canDeleteInitiative = isMyCreator(init.created_by, user) || canEdit;
+    const canEditInitiative = isMyCreator(init.created_by, user) || canEdit;
 
     return (
       <article
@@ -1406,8 +1440,8 @@ export default function InitiativesPage() {
     const initiativeTasks = tasks.filter((t) => t.initiative_id === init.id);
     const progress = taskProgress(initiativeTasks);
     const isPassed = isDeadlinePassed(init.deadline);
-    const canDeleteInitiative = isMyCreator(init.created_by, user) || privileged;
-    const canEditInitiative = isMyCreator(init.created_by, user) || privileged;
+    const canDeleteInitiative = isMyCreator(init.created_by, user) || canEdit;
+    const canEditInitiative = isMyCreator(init.created_by, user) || canEdit;
 
     return (
       <div className="space-y-6 animate-rise-in">
@@ -1533,7 +1567,7 @@ export default function InitiativesPage() {
                   </span>
                 </div>
 
-                {!isPassed && privileged && (
+                {!isPassed && canEdit && (
                   <button
                     type="button"
                     onClick={() => setShowEditTeamModalFor(init.id)}
@@ -1582,7 +1616,7 @@ export default function InitiativesPage() {
                   </span>
                 </div>
 
-                {!isPassed && privileged && (
+                {!isPassed && canAdd && (
                   <button
                     type="button"
                     onClick={() => setShowAddStageModalFor(init.id)}
@@ -1618,24 +1652,28 @@ export default function InitiativesPage() {
                             </h4>
                           </div>
 
-                          {!isPassed && privileged && (
+                          {!isPassed && (canAdd || canEdit) && (
                             <div className="flex shrink-0 items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setAddTaskStageTarget({ id: stg.id, name: stg.name })
-                                }
-                                className={BTN_QUIET}
-                              >
-                                <Plus className="h-3.5 w-3.5" /> Add task
-                              </button>
-                              <IconButton
-                                danger
-                                label="Delete stage"
-                                onClick={() => handleDeleteStage(stg.id)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </IconButton>
+                              {canAdd && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setAddTaskStageTarget({ id: stg.id, name: stg.name })
+                                  }
+                                  className={BTN_QUIET}
+                                >
+                                  <Plus className="h-3.5 w-3.5" /> Add task
+                                </button>
+                              )}
+                              {canEdit && (
+                                <IconButton
+                                  danger
+                                  label="Delete stage"
+                                  onClick={() => handleDeleteStage(stg.id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </IconButton>
+                              )}
                             </div>
                           )}
                         </div>
@@ -1696,7 +1734,7 @@ export default function InitiativesPage() {
                                     )}
                                   </div>
 
-                                {!isPassed && (isMyCreator(tsk.creator_id, user) || privileged) && (
+                                {!isPassed && (isMyCreator(tsk.creator_id, user) || canEdit) && (
                                   <div className="flex shrink-0 items-center gap-0.5">
                                     {isMyCreator(tsk.creator_id, user) && (
                                       <IconButton
@@ -1706,7 +1744,7 @@ export default function InitiativesPage() {
                                         <Edit2 className="h-3.5 w-3.5" />
                                       </IconButton>
                                     )}
-                                    {(isMyCreator(tsk.creator_id, user) || privileged) && (
+                                    {(isMyCreator(tsk.creator_id, user) || canEdit) && (
                                       <IconButton
                                         danger
                                         label="Delete task"
@@ -1840,7 +1878,7 @@ export default function InitiativesPage() {
               title="Initiatives"
               description="Initiatives, their stages, and the tasks inside them."
               action={
-                privileged && (
+                canAdd && (
                   <button onClick={() => setShowAddInitiativeModal(true)} className={BTN_PRIMARY}>
                     <Plus className="h-4 w-4" />
                     New initiative
