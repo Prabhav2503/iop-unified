@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Mail,
   Phone,
@@ -13,10 +13,12 @@ import {
   Check,
   ExternalLink,
   Loader2,
+  RefreshCw,
 } from 'lucide-react';
-import { getTeamMemberById } from '../API/team';
-import { getAllInitiatives } from '../API/initiative';
+import { useTeamMemberById, useTeamMemberActivity } from '../hooks/useQueries';
 import { Modal, Chip, IconChip, ErrorPanel, CancelButton } from './ui';
+
+// ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function getRoleStr(role) {
   return (Array.isArray(role) ? role.join(' ') : role || '').toLowerCase();
@@ -60,7 +62,34 @@ function toList(value) {
   return [String(value)];
 }
 
-function CopyButton({ text, label = 'Copy' }) {
+// Maps initiative/task status → chip tone
+const STATUS_TONE = {
+  active: 'accent',
+  ongoing: 'accent',
+  completed: 'success',
+  done: 'success',
+  pending: 'neutral',
+  paused: 'neutral',
+  cancelled: 'neutral',
+};
+
+const PRIORITY_TONE = {
+  high: 'danger',
+  medium: 'neutral',
+  low: 'outline',
+};
+
+function statusTone(s) {
+  return STATUS_TONE[(s || '').toLowerCase()] ?? 'outline';
+}
+
+function priorityTone(p) {
+  return PRIORITY_TONE[(p || '').toLowerCase()] ?? 'outline';
+}
+
+// ─── Sub-components ────────────────────────────────────────────────────────────
+
+function CopyBtn({ text, label = 'Copy' }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async (e) => {
@@ -71,7 +100,7 @@ function CopyButton({ text, label = 'Copy' }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // Fallback
+      // Fallback — silently ignore
     }
   };
 
@@ -115,253 +144,278 @@ function DetailRow({ icon, label, value, href, copyValue }) {
       </div>
       {copyValue && (
         <div className="shrink-0">
-          <CopyButton text={copyValue} label={`Copy ${label}`} />
+          <CopyBtn text={copyValue} label={`Copy ${label}`} />
         </div>
       )}
     </div>
   );
 }
 
+// ─── Activity skeleton ─────────────────────────────────────────────────────────
+
+function ActivitySkeleton() {
+  return (
+    <div className="space-y-3 p-4 sm:p-5 animate-pulse">
+      {[1, 2].map((n) => (
+        <div key={n} className="space-y-2">
+          <div className="h-3 w-24 rounded bg-muted" />
+          <div className="flex gap-2">
+            <div className="h-8 w-40 rounded-surface bg-muted" />
+            <div className="h-8 w-32 rounded-surface bg-muted" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Activity section ─────────────────────────────────────────────────────────
+
+function ActivitySection({ memberId }) {
+  const {
+    data: activity,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useTeamMemberActivity(memberId);
+
+  if (isLoading) return <ActivitySkeleton />;
+
+  if (isError) {
+    return (
+      <div className="space-y-3 px-4 py-4 sm:px-5 text-center">
+        <p className="text-body text-red-400">
+          {error?.message || 'Failed to load activity'}
+        </p>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          className="inline-flex items-center gap-1.5 rounded-control border border-line bg-surface px-3 py-1.5 text-meta font-medium text-ink hover:bg-muted transition-colors"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  const initiatives = activity?.initiatives ?? [];
+  const tasks = activity?.tasks ?? [];
+  const hasActivity = initiatives.length > 0 || tasks.length > 0;
+
+  if (!hasActivity) {
+    return (
+      <div className="px-5 py-6 text-center text-ink-faint text-body">
+        No initiatives or tasks assigned to this member yet.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 p-4 sm:p-5">
+      {initiatives.length > 0 && (
+        <div>
+          <p className="text-micro font-semibold uppercase tracking-wide text-ink-faint mb-2">
+            Initiatives ({initiatives.length})
+          </p>
+          <div className="flex flex-col gap-2">
+            {initiatives.map((init) => (
+              <div
+                key={init.id}
+                className="flex items-center justify-between gap-2 rounded-surface border border-line-subtle bg-muted/40 px-3 py-2"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Rocket className="h-3.5 w-3.5 shrink-0 text-accent-300" aria-hidden="true" />
+                  <span className="truncate text-body font-medium text-ink">
+                    {init.name || 'Unnamed Initiative'}
+                  </span>
+                </div>
+                {init.status && (
+                  <Chip tone={statusTone(init.status)}>
+                    {init.status}
+                  </Chip>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tasks.length > 0 && (
+        <div>
+          <p className="text-micro font-semibold uppercase tracking-wide text-ink-faint mb-2">
+            Tasks ({tasks.length})
+          </p>
+          <div className="flex flex-col gap-2">
+            {tasks.map((task) => (
+              <div
+                key={task.id}
+                className="flex items-center justify-between gap-2 rounded-surface border border-line-subtle bg-muted/40 px-3 py-2"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <CheckSquare className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden="true" />
+                  <span className="truncate text-body font-medium text-ink">
+                    {task.title || 'Untitled Task'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {task.priority && (
+                    <Chip tone={priorityTone(task.priority)}>
+                      {task.priority}
+                    </Chip>
+                  )}
+                  {task.status && (
+                    <Chip tone={statusTone(task.status)}>
+                      {task.status}
+                    </Chip>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main modal ───────────────────────────────────────────────────────────────
+
 export default function TeamMemberDetailModal({ memberId, initialMember = null, onClose }) {
-  const [member, setMember] = useState(initialMember);
-  const [initiativesMap, setInitiativesMap] = useState({});
-  const [loading, setLoading] = useState(!initialMember);
-  const [error, setError] = useState('');
+  const {
+    data: member,
+    isLoading,
+    isError,
+    error,
+  } = useTeamMemberById(memberId);
 
-  useEffect(() => {
-    let isMounted = true;
+  // Fall back to the passed-in snapshot while the full record loads
+  const displayMember = member ?? initialMember;
 
-    async function fetchMemberDetails() {
-      if (!memberId) return;
-      setLoading(true);
-      setError('');
-
-      try {
-        // Fetch member by ID and initiatives map in parallel
-        const [memberRes, initiativesRes] = await Promise.allSettled([
-          getTeamMemberById(memberId),
-          getAllInitiatives(),
-        ]);
-
-        if (!isMounted) return;
-
-        // Process initiatives for ID -> Title mapping
-        if (initiativesRes.status === 'fulfilled' && initiativesRes.value?.data) {
-          const map = {};
-          for (const init of initiativesRes.value.data) {
-            if (init.id) {
-              map[init.id] = init.name;
-            }
-          }
-          setInitiativesMap(map);
-        }
-
-        // Process member response
-        if (memberRes.status === 'fulfilled') {
-          const res = memberRes.value;
-          if (res.error) {
-            setError(res.error);
-          } else if (res.data) {
-            setMember(res.data);
-          } else {
-            setError('Member details not found');
-          }
-        } else {
-          setError('Failed to fetch team member details');
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(err.message || 'An unexpected error occurred');
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    fetchMemberDetails();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [memberId]);
-
-  const initiatives = toList(member?.initiative).map((item) => initiativesMap[item] || item);
-  const tasks = toList(member?.tasks);
-  const contributions = toList(member?.contribution);
-  const hasActivity = initiatives.length > 0 || tasks.length > 0 || contributions.length > 0;
+  const contributions = toList(displayMember?.contribution);
 
   return (
     <Modal
       title="Team Member Details"
-      subtitle={member?.name ? `Information and activity for ${member.name}` : undefined}
+      subtitle={displayMember?.name ? `Information and activity for ${displayMember.name}` : undefined}
       onClose={onClose}
       maxWidth="max-w-xl"
       footer={<CancelButton onClose={onClose} />}
     >
-      {loading ? (
+      {isLoading && !displayMember ? (
         <div className="flex flex-col items-center justify-center gap-3 py-12 text-ink-faint">
           <Loader2 className="h-6 w-6 animate-spin text-accent-300" />
           <p className="text-body font-medium">Loading member information...</p>
         </div>
-      ) : error ? (
+      ) : isError && !displayMember ? (
         <div className="space-y-4">
-          <ErrorPanel>{error}</ErrorPanel>
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={() => {
-                setLoading(true);
-                setError('');
-                getTeamMemberById(memberId).then((res) => {
-                  setLoading(false);
-                  if (res.error) setError(res.error);
-                  else setMember(res.data);
-                });
-              }}
-              className="rounded-control border border-line bg-surface px-3 py-1.5 text-meta font-medium text-ink hover:bg-muted"
-            >
-              Try Again
-            </button>
-          </div>
+          <ErrorPanel>{error?.message || 'Failed to load member'}</ErrorPanel>
         </div>
-      ) : member ? (
+      ) : displayMember ? (
         <div className="space-y-5">
           {/* Identity Header Card */}
           <div className="rounded-surface border border-line bg-surface p-4 sm:p-5 shadow-card">
             <div className="flex items-start gap-4">
               <span
                 className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-chip font-display text-title font-semibold ${
-                  isLeadership(member.role)
+                  isLeadership(displayMember.role)
                     ? 'bg-accent-soft text-accent-300'
                     : 'bg-muted text-ink-faint'
                 }`}
                 aria-hidden="true"
               >
-                {(member.name || '?').trim().charAt(0).toUpperCase()}
+                {(displayMember.name || '?').trim().charAt(0).toUpperCase()}
               </span>
 
               <div className="min-w-0 flex-1">
                 <h3 className="font-display text-title font-semibold text-ink truncate">
-                  {member.name || 'Unnamed Member'}
+                  {displayMember.name || 'Unnamed Member'}
                 </h3>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  <Chip tone={roleTone(member.role)}>{getRoleDisplay(member.role)}</Chip>
-                  {member.vertical && <Chip tone="outline">{member.vertical}</Chip>}
+                  <Chip tone={roleTone(displayMember.role)}>{getRoleDisplay(displayMember.role)}</Chip>
+                  {displayMember.vertical && <Chip tone="outline">{displayMember.vertical}</Chip>}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Contact and General Information */}
+          {/* Contact & Details */}
           <section className="rounded-surface border border-line bg-surface shadow-card overflow-hidden">
             <div className="border-b border-line-subtle px-4 py-3 sm:px-5">
               <h4 className="font-display text-meta font-semibold uppercase tracking-wider text-ink-muted">
-                Contact & Details
+                Contact &amp; Details
               </h4>
             </div>
             <div className="divide-y divide-line-subtle">
               <DetailRow
                 icon={Mail}
                 label="Email Address"
-                value={member.email}
-                href={member.email ? `mailto:${member.email}` : undefined}
-                copyValue={member.email}
+                value={displayMember.email}
+                href={displayMember.email ? `mailto:${displayMember.email}` : undefined}
+                copyValue={displayMember.email}
               />
               <DetailRow
                 icon={Phone}
                 label="Phone Number"
-                value={member.number}
-                href={member.number ? `tel:${member.number}` : undefined}
-                copyValue={member.number}
+                value={displayMember.number}
+                href={displayMember.number ? `tel:${displayMember.number}` : undefined}
+                copyValue={displayMember.number}
               />
               <DetailRow
                 icon={Layers}
                 label="Vertical"
-                value={member.vertical || 'All / General'}
+                value={displayMember.vertical || 'All / General'}
               />
               <DetailRow
                 icon={Briefcase}
                 label="Role Designation"
-                value={getRoleDisplay(member.role)}
+                value={getRoleDisplay(displayMember.role)}
               />
               <DetailRow
                 icon={Calendar}
                 label="Member Since"
-                value={formatDate(member.created_at)}
+                value={formatDate(displayMember.created_at)}
               />
-              {member.id && (
+              {displayMember.id && (
                 <DetailRow
                   icon={IdCard}
                   label="System ID"
-                  value={member.id}
-                  copyValue={member.id}
+                  value={displayMember.id}
+                  copyValue={displayMember.id}
                 />
               )}
             </div>
           </section>
 
-          {/* Activity Section: Initiatives, Tasks, Contributions */}
+          {/* Contributions (still a column on Team) */}
+          {contributions.length > 0 && (
+            <section className="rounded-surface border border-line bg-surface shadow-card overflow-hidden">
+              <div className="border-b border-line-subtle px-4 py-3 sm:px-5">
+                <h4 className="font-display text-meta font-semibold uppercase tracking-wider text-ink-muted">
+                  Contributions
+                </h4>
+              </div>
+              <div className="p-4 sm:p-5">
+                <div className="flex flex-wrap gap-1.5">
+                  {contributions.map((item, i) => (
+                    <Chip key={`contrib-${i}`} tone="neutral" icon={Sparkles}>
+                      {item}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Activity — Initiatives & Tasks from junction tables */}
           <section className="rounded-surface border border-line bg-surface shadow-card overflow-hidden">
             <div className="border-b border-line-subtle px-4 py-3 sm:px-5">
               <h4 className="font-display text-meta font-semibold uppercase tracking-wider text-ink-muted">
-                Activity & Assignments
+                Activity &amp; Assignments
               </h4>
             </div>
-
-            {hasActivity ? (
-              <div className="space-y-4 p-4 sm:p-5">
-                {initiatives.length > 0 && (
-                  <div>
-                    <p className="text-micro font-semibold uppercase tracking-wide text-ink-faint">
-                      Initiatives ({initiatives.length})
-                    </p>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {initiatives.map((item, i) => (
-                        <Chip key={`init-${i}`} tone="accent" icon={Rocket}>
-                          {item}
-                        </Chip>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {tasks.length > 0 && (
-                  <div>
-                    <p className="text-micro font-semibold uppercase tracking-wide text-ink-faint">
-                      Tasks ({tasks.length})
-                    </p>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {tasks.map((item, i) => (
-                        <Chip key={`task-${i}`} tone="neutral" icon={CheckSquare}>
-                          {item}
-                        </Chip>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {contributions.length > 0 && (
-                  <div>
-                    <p className="text-micro font-semibold uppercase tracking-wide text-ink-faint">
-                      Contributions ({contributions.length})
-                    </p>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {contributions.map((item, i) => (
-                        <Chip key={`contrib-${i}`} tone="neutral" icon={Sparkles}>
-                          {item}
-                        </Chip>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="px-5 py-6 text-center text-ink-faint text-body">
-                No initiatives, tasks, or contributions recorded yet for this member.
-              </div>
-            )}
+            <ActivitySection memberId={memberId} />
           </section>
         </div>
       ) : null}
