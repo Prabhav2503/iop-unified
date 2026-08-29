@@ -138,7 +138,6 @@ router.get("/:id/activity", async (req, res) => {
           tasks (
             id,
             title,
-            description,
             status,
             priority,
             deadline
