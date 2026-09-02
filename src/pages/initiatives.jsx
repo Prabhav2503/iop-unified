@@ -1268,7 +1268,7 @@ export default function InitiativesPage() {
       alert(`Delete failed: ${res.error}`);
     } else {
       setInitiatives((prev) => prev.filter((i) => i.id !== id));
-      if (selectedInitiativeId === id) handleCloseInitiative();
+      if (String(selectedInitiativeId) === String(id)) handleCloseInitiative();
     }
   };
 
