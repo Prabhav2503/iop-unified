@@ -31,23 +31,7 @@ import {
 } from '../components/ui';
 import { useFilterReplay } from '../hooks/useFilterReplay';
 
-// ─── Role Helper ────────────────────────────────────────────────────────────
-
-function getRoleStr(role) {
-  return (Array.isArray(role) ? role.join(' ') : role || '').toLowerCase();
-}
-
-// Privileged roles for Contact actions: admin, overall_coordinator, co_overall_coordinator, coordinator
-function isPrivilegedContactRole(user) {
-  if (!user) return false;
-  const r = getRoleStr(user.role);
-  return (
-    r.includes('admin') ||
-    r.includes('overall_coordinator') ||
-    r.includes('co_overall_coordinator') ||
-    r.includes('coordinator')
-  );
-}
+import { getRoleStr, editPrivilegedRole, addPrivilegedRole } from '../utility/permissions';
 
 const VISIBILITY_OPTIONS = [
   { value: 'all', label: 'All contacts' },
@@ -378,9 +362,10 @@ function AddContactModal({
 
 export default function ContactsPage() {
   const { user } = useAuth();
-  const privileged = isPrivilegedContactRole(user);
+  const canEdit = editPrivilegedRole(user);
+  const canAdd = addPrivilegedRole(user);
 
-  const { data: contacts = [], isLoading: loading, error: queryError } = useContactsForRole(privileged);
+  const { data: contacts = [], isLoading: loading, error: queryError } = useContactsForRole(canEdit);
   const deleteContactMutation = useDeleteContact();
   const toggleVisibilityMutation = useToggleContactVisibility();
 
@@ -483,7 +468,7 @@ export default function ContactsPage() {
           title="Contacts"
           description="Directory of stakeholders, partners and mentors."
           action={
-            privileged && (
+            canAdd && (
               <button onClick={() => setShowAddModal(true)} className={BTN_PRIMARY}>
                 <Plus className="h-4 w-4" />
                 Add contact
@@ -502,7 +487,7 @@ export default function ContactsPage() {
             placeholder="Search by name, organisation, role or tag..."
           />
 
-          {privileged && (
+          {canEdit && (
             <PillFilter
               value={visibilityFilter}
               onChange={(v) => {
@@ -549,7 +534,7 @@ export default function ContactsPage() {
                           {contact.name}
                         </h3>
                         {/* Hidden state: ONE signal, nothing else changes */}
-                        {privileged && isHidden && (
+                        {canEdit && isHidden && (
                           <Chip icon={EyeOff} title="Not visible to executives">
                             Hidden
                           </Chip>
@@ -563,7 +548,7 @@ export default function ContactsPage() {
                       )}
                     </div>
 
-                    {privileged && (
+                    {canEdit && (
                       <div className="flex shrink-0 items-center gap-0.5">
                         <IconButton
                           disabled={isToggling}
@@ -637,7 +622,7 @@ export default function ContactsPage() {
                   )}
 
                   {/* Internal reference — privileged only, out of the hierarchy */}
-                  {privileged && contact.dataset_id && (
+                  {canEdit && contact.dataset_id && (
                     <p
                       title={contact.dataset_id}
                       className="mt-4 truncate border-t border-line-subtle pt-3 font-mono text-micro text-ink-faint/70"

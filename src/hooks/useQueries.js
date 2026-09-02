@@ -18,7 +18,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getAllInitiatives, createInitiative, deleteInitiative } from '../API/initiative';
 import { getAllTasks, createTask, deleteTask, updateTask } from '../API/task';
-import { getAllTeamMembers, getTeamDropdown, getTeamMemberById, deleteTeamMember } from '../API/team';
+import { getAllTeamMembers, getTeamDropdown, getTeamMemberById, getTeamMemberActivity, deleteTeamMember } from '../API/team';
 import { getAllContacts, getVisibleContacts, createContact, deleteContact, toggleContactVisibility } from '../API/contact';
 import { getAllStartups, createStartup, deleteStartup } from '../API/startup';
 import { getAllDatabaseRecords, createDatabaseRecord, updateDatabaseRecord, deleteDatabaseRecord } from '../API/database';
@@ -31,6 +31,7 @@ export const KEYS = {
   team: ['team'],
   teamDropdown: ['team-dropdown'],
   teamMember: (id) => ['team-member', id],
+  teamMemberActivity: (id) => ['team-member-activity', id],
   contacts: ['contacts'],
   startups: ['startups'],
   databaseRecords: ['database-records'],
@@ -126,6 +127,19 @@ export function useTeamMemberById(id) {
     queryKey: KEYS.teamMember(id),
     queryFn: () => getTeamMemberById(id).then((r) => { if (r.error) throw new Error(r.error); return r.data; }),
     enabled: Boolean(id),
+  });
+}
+
+export function useTeamMemberActivity(id) {
+  return useQuery({
+    queryKey: KEYS.teamMemberActivity(id),
+    queryFn: () =>
+      getTeamMemberActivity(id).then((r) => {
+        if (r.error) throw new Error(r.error);
+        return r.data ?? { initiatives: [], tasks: [] };
+      }),
+    enabled: Boolean(id),
+    staleTime: 30_000,
   });
 }
 

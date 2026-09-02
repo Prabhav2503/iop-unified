@@ -37,23 +37,7 @@ import {
   EmptyPanel,
 } from '../components/ui';
 import { useFilterReplay } from '../hooks/useFilterReplay';
-
-// ─── Helpers & Role Check ───────────────────────────────────────────────────
-
-function getRoleStr(role) {
-  return (Array.isArray(role) ? role.join(' ') : role || '').toLowerCase();
-}
-
-function isPrivilegedRole(user) {
-  if (!user) return false;
-  const r = getRoleStr(user.role);
-  return (
-    r.includes('admin') ||
-    r.includes('overall_coordinator') ||
-    r.includes('co_overall_coordinator') ||
-    r.includes('coordinator')
-  );
-}
+import { getRoleStr, editPrivilegedRole, addPrivilegedRole } from '../utility/permissions';
 
 const SECTORS = [
   'EdTech',
@@ -427,7 +411,8 @@ function StartupDetailModal({ startupId, contacts, initiatives, onClose }) {
 
 export default function StartupsPage() {
   const { user } = useAuth();
-  const privileged = isPrivilegedRole(user);
+  const canEdit = editPrivilegedRole(user);
+  const canAdd = addPrivilegedRole(user);
 
   const { data: startups = [], isLoading: startupsLoading, error: startupsError } = useStartups();
   const { data: contacts = [] } = useContacts();
@@ -502,7 +487,7 @@ export default function StartupsPage() {
           title="Startups"
           description="Ventures the cell has incubated, accelerated or mentored."
           action={
-            privileged && (
+            canAdd && (
               <button onClick={() => setShowAddModal(true)} className={BTN_PRIMARY}>
                 <Plus className="h-4 w-4" />
                 Add startup
@@ -586,7 +571,7 @@ export default function StartupsPage() {
                       </span>
                     </button>
 
-                    {privileged && (
+                    {canEdit && (
                       <IconButton
                         danger
                         disabled={isDeleting}

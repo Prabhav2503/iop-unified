@@ -107,6 +107,66 @@ router.get("/dropdown/all", async (req, res) => {
   }
 });
 
+// GET /api/teams/:id/activity
+// Returns all initiatives and tasks linked to this team member via junction tables.
+router.get("/:id/activity", async (req, res) => {
+  try {
+    const teamId = req.params.id;
+
+    const [initiativesResult, tasksResult] = await Promise.all([
+      // initiatives via initiative_team join
+      supabase
+        .from("initiative_team")
+        .select(`
+          initiative_id,
+          initiatives (
+            id,
+            name,
+            description,
+            status,
+            deadline,
+            impact
+          )
+        `)
+        .eq("team_id", teamId),
+
+      // tasks via task_assignees join
+      supabase
+        .from("task_assignees")
+        .select(`
+          task_id,
+          tasks (
+            id,
+            title,
+            status,
+            priority,
+            deadline
+          )
+        `)
+        .eq("team_id", teamId),
+    ]);
+
+    if (initiativesResult.error) {
+      return res.status(400).json({ message: initiativesResult.error.message, error: initiativesResult.error });
+    }
+    if (tasksResult.error) {
+      return res.status(400).json({ message: tasksResult.error.message, error: tasksResult.error });
+    }
+
+    const initiatives = (initiativesResult.data || [])
+      .map((row) => row.initiatives)
+      .filter(Boolean);
+
+    const tasks = (tasksResult.data || [])
+      .map((row) => row.tasks)
+      .filter(Boolean);
+
+    return res.status(200).json({ data: { initiatives, tasks } });
+  } catch (err) {
+    return res.status(500).json({ message: "Internal Server Error", error: err.message });
+  }
+});
+
 router.get("/:id", async (req, res) => {
   if (handleValidationErrors(req, res)) {
     return;

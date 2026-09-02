@@ -30,25 +30,9 @@ import {
   ErrorPanel,
   EmptyPanel,
 } from '../components/ui';
+import { getRoleStr, editPrivilegedRole, addPrivilegedRole } from '../utility/permissions';
 
-// ─── Helpers & Role Check ───────────────────────────────────────────────────
-
-function getRoleStr(user) {
-  if (!user) return '';
-  const r = user.role || user.roles || user.user_role || '';
-  return (Array.isArray(r) ? r.join(' ') : String(r)).toLowerCase();
-}
-
-function isPrivilegedRole(user) {
-  if (!user) return false;
-  const r = getRoleStr(user);
-  return (
-    r.includes('admin') ||
-    r.includes('overall_coordinator') ||
-    r.includes('co_overall_coordinator') ||
-    r.includes('coordinator')
-  );
-}
+// ─── Helpers & Formatting ───────────────────────────────────────────────────
 
 function formatDate(value) {
   if (!value) return null;
@@ -174,7 +158,8 @@ function DriveRecordModal({ initialRecord, onClose, onSuccess }) {
 
 export default function DatabasePage() {
   const { user } = useAuth();
-  const privileged = isPrivilegedRole(user);
+  const canEdit = editPrivilegedRole(user);
+  const canAdd = addPrivilegedRole(user);
 
   const { data: records = [], isLoading: loading, error: queryError } = useDatabaseRecords();
   const deleteRecordMutation = useDeleteDatabaseRecord();
@@ -233,7 +218,7 @@ export default function DatabasePage() {
           title="Drive links"
           description="Shared folders and documents the cell works out of."
           action={
-            privileged && (
+            canAdd && (
               <button onClick={() => setShowAddModal(true)} className={BTN_PRIMARY}>
                 <Plus className="h-4 w-4" />
                 Add drive link
@@ -296,7 +281,7 @@ export default function DatabasePage() {
                       </p>
                     </div>
 
-                    {privileged && (
+                    {canEdit && (
                       <div className="flex shrink-0 items-center gap-0.5">
                         <IconButton label="Edit" onClick={() => setEditingRecord(rec)}>
                           <Edit2 className="h-3.5 w-3.5" />

@@ -83,6 +83,36 @@ export const getTeamMemberById = async (id) => {
     }
 };
 
+// GET /api/teams/:id/activity
+// Returns all initiatives and tasks linked to this member via junction tables.
+// Returns: { data: { initiatives: Initiative[], tasks: Task[] } } | { error: string }
+export const getTeamMemberActivity = async (id) => {
+    if (!id) {
+        return { error: "Team member ID is required" };
+    }
+
+    try {
+        const response = await fetch(`${BASE}/${id}/activity`, {
+            method: "GET",
+            credentials: "include",
+            headers: {
+                "Content-Type": "application/json"
+            }
+        });
+
+        const json = await response.json().catch(() => null);
+
+        if (!response.ok) {
+            throw new Error(json?.message || `HTTP error! Status: ${response.status}`);
+        }
+
+        return { data: json.data };
+    } catch (err) {
+        return { error: err.message || "Failed to fetch member activity" };
+    }
+};
+
+
 // POST /api/teams/register
 // Body: { name, role, email, number, initiative, tasks, contribution, vertical }
 // Returns: { data: TeamMember } | { error: string }
