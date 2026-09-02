@@ -1,4 +1,5 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import { validationResult } from "express-validator";
 import supabase from "../utility/supabase.js";
 import { loginClientValidator, changePasswordValidator } from "../validator/auth.js";
@@ -7,31 +8,13 @@ import { tokengenerator, verifytoken } from "../utility/helper.js";
 dotenv.config();
 
 const router = express.Router();
-const AUTH_RATE_WINDOW_MS = 60 * 1000;
-const AUTH_RATE_MAX_REQUESTS = 120;
-const authRateBuckets = new Map();
-
-function authRateLimiter(req, res, next) {
-  const ipFromHeader = req.headers["x-forwarded-for"];
-  const clientIp = (Array.isArray(ipFromHeader) ? ipFromHeader[0] : ipFromHeader || req.ip || "unknown")
-    .toString()
-    .split(",")[0]
-    .trim();
-  const now = Date.now();
-  const currentBucket = authRateBuckets.get(clientIp);
-
-  if (!currentBucket || now - currentBucket.windowStart >= AUTH_RATE_WINDOW_MS) {
-    authRateBuckets.set(clientIp, { count: 1, windowStart: now });
-    return next();
-  }
-
-  if (currentBucket.count >= AUTH_RATE_MAX_REQUESTS) {
-    return res.status(429).json({ message: "Too many requests. Please try again later." });
-  }
-
-  currentBucket.count += 1;
-  return next();
-}
+const authRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many requests. Please try again later." },
+});
 
 router.post("/login", loginClientValidator, async (req, res) => {
   const errors = validationResult(req);
@@ -126,7 +109,7 @@ router.get("/me", authRateLimiter, async (req, res) => {
   }
 });
 
-router.put("/update-password",changePasswordValidator,  async (req, res) => {
+router.put("/update-password", authRateLimiter, changePasswordValidator, async (req, res) => {
   const current = req.body.currentPassword;  
   const newPassword = req.body.newPassword;
   const profile_id = req.body.profile_id;
