@@ -1,4 +1,5 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import { validationResult } from "express-validator";
 import supabase from "../utility/supabase.js";
 import { loginClientValidator, changePasswordValidator } from "../validator/auth.js";
@@ -7,6 +8,13 @@ import { tokengenerator, verifytoken } from "../utility/helper.js";
 dotenv.config();
 
 const router = express.Router();
+const authRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many requests. Please try again later." },
+});
 
 router.post("/login", loginClientValidator, async (req, res) => {
   const errors = validationResult(req);
@@ -84,7 +92,7 @@ router.post("/logout", (req, res) => {
 });
 
 
-router.get("/me", async (req, res) => {
+router.get("/me", authRateLimiter, async (req, res) => {
   const token = req.cookies.token ? req.cookies.token : req.headers['token'];
   if (!token) {
     return res.status(401).json({ message: "Unauthorized: No token provided" });
@@ -101,7 +109,7 @@ router.get("/me", async (req, res) => {
   }
 });
 
-router.put("/update-password",changePasswordValidator,  async (req, res) => {
+router.put("/update-password", authRateLimiter, changePasswordValidator, async (req, res) => {
   const current = req.body.currentPassword;  
   const newPassword = req.body.newPassword;
   const profile_id = req.body.profile_id;

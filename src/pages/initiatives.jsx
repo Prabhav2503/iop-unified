@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Plus,
   Trash2,
@@ -1125,6 +1126,8 @@ export default function InitiativesPage() {
   const { user } = useAuth();
   const canEdit = editPrivilegedRole(user);
   const canAdd = addPrivilegedRole(user);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const routeInitiativeId = searchParams.get('id');
 
   const [initiatives, setInitiatives] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -1192,7 +1195,7 @@ export default function InitiativesPage() {
     void fetchData();
   }, [fetchData]);
 
-  const handleOpenInitiative = async (initId) => {
+  const openInitiativeDetails = useCallback(async (initId) => {
     setSelectedInitiativeId(initId);
     setDetailsLoading(true);
 
@@ -1233,7 +1236,25 @@ export default function InitiativesPage() {
     } finally {
       setDetailsLoading(false);
     }
+  }, []);
+
+  const handleOpenInitiative = (initId) => {
+    setSearchParams({ id: initId });
   };
+
+  const handleCloseInitiative = () => {
+    setSelectedInitiativeId(null);
+    setSearchParams({});
+  };
+
+  useEffect(() => {
+    if (!routeInitiativeId) {
+      setSelectedInitiativeId(null);
+      return;
+    }
+    if (loading) return;
+    void openInitiativeDetails(routeInitiativeId);
+  }, [routeInitiativeId, loading, openInitiativeDetails]);
 
   const handleDeleteInitiative = async (e, id) => {
     e.stopPropagation();
@@ -1247,7 +1268,7 @@ export default function InitiativesPage() {
       alert(`Delete failed: ${res.error}`);
     } else {
       setInitiatives((prev) => prev.filter((i) => i.id !== id));
-      if (selectedInitiativeId === id) setSelectedInitiativeId(null);
+      if (String(selectedInitiativeId) === String(id)) handleCloseInitiative();
     }
   };
 
@@ -1283,7 +1304,7 @@ export default function InitiativesPage() {
   const { myInitiatives, otherInitiatives } = partitionInitiatives(filteredInitiatives, user);
 
   // Selected initiative
-  const selectedInitiative = initiatives.find((i) => i.id === selectedInitiativeId);
+  const selectedInitiative = initiatives.find((i) => String(i.id) === String(selectedInitiativeId));
 
   // ── Summary figures. Every one of these is derived from `initiatives` and
   // ── `tasks` already in state — no additional requests, no new fields.
@@ -1449,7 +1470,7 @@ export default function InitiativesPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
-            onClick={() => setSelectedInitiativeId(null)}
+            onClick={handleCloseInitiative}
             className="inline-flex items-center gap-2 rounded-control border border-line bg-surface px-3.5 py-2 text-body font-semibold text-ink transition-colors hover:border-accent-400 hover:bg-muted active:scale-[0.98]"
           >
             <ArrowLeft className="h-4 w-4 text-accent-300" />

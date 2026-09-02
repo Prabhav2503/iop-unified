@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Rocket, CheckSquare, Plus, Loader2, Calendar, Clock, Key, Trash2, Pencil, Edit2, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { changePassword } from '../API/auth';
@@ -20,6 +21,7 @@ import {
   LoadingPanel,
   ErrorPanel,
   IconButton,
+  FOCUS,
 } from '../components/ui';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -681,26 +683,28 @@ export default function Dashboard() {
                     {upcomingInitiatives.map((init) => {
                       const left = daysUntil(init.deadline);
                       return (
-                        <li
-                          key={init.id}
-                          className="flex items-baseline justify-between gap-4 py-2.5 first:pt-0 last:pb-0"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-body font-medium text-ink">{init.name}</p>
-                            {init.impact && (
-                              <p className="mt-0.5 truncate text-meta text-ink-faint">
-                                {init.impact}
-                              </p>
-                            )}
-                          </div>
-                          <span
-                            className={`inline-flex shrink-0 items-center gap-1.5 text-meta tabular-nums ${
-                              left <= 2 ? 'font-medium text-warn-ink' : 'text-ink-faint'
-                            }`}
+                        <li key={init.id} className="first:pt-0 last:pb-0">
+                          <Link
+                            to={`/initiatives?id=${encodeURIComponent(init.id)}`}
+                            className={`-mx-1 flex items-baseline justify-between gap-4 rounded-control px-1 py-2.5 transition-colors duration-150 hover:bg-muted ${FOCUS}`}
                           >
-                            <Clock className="h-3 w-3 shrink-0" aria-hidden="true" />
-                            {left === 0 ? 'Today' : left === 1 ? 'Tomorrow' : `${left} days`}
-                          </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-body font-medium text-ink">{init.name}</p>
+                              {init.impact && (
+                                <p className="mt-0.5 truncate text-meta text-ink-faint">
+                                  {init.impact}
+                                </p>
+                              )}
+                            </div>
+                            <span
+                              className={`inline-flex shrink-0 items-center gap-1.5 text-meta tabular-nums ${
+                                left <= 2 ? 'font-medium text-warn-ink' : 'text-ink-faint'
+                              }`}
+                            >
+                              <Clock className="h-3 w-3 shrink-0" aria-hidden="true" />
+                              {left === 0 ? 'Today' : left === 1 ? 'Tomorrow' : `${left} days`}
+                            </span>
+                          </Link>
                         </li>
                       );
                     })}
@@ -800,25 +804,30 @@ export default function Dashboard() {
               ) : (
                 <ul className="divide-y divide-line-subtle">
                   {myInitiatives.map((init) => (
-                    <li key={init.id} className="py-3 first:pt-0 last:pb-0">
-                      <div className="flex items-baseline justify-between gap-4">
-                        <div className="flex min-w-0 items-baseline gap-2">
-                          <p className="truncate text-body font-medium text-ink">{init.name}</p>
-                          <StatusChip status={init.status} />
+                    <li key={init.id} className="first:pt-0 last:pb-0">
+                      <Link
+                        to={`/initiatives?id=${encodeURIComponent(init.id)}`}
+                        className={`-mx-1 block rounded-control px-1 py-3 transition-colors duration-150 hover:bg-muted ${FOCUS}`}
+                      >
+                        <div className="flex items-baseline justify-between gap-4">
+                          <div className="flex min-w-0 items-baseline gap-2">
+                            <p className="truncate text-body font-medium text-ink">{init.name}</p>
+                            <StatusChip status={init.status} />
+                          </div>
+                          {init.deadline && (
+                            <span className="inline-flex shrink-0 items-center gap-1.5 text-meta tabular-nums text-ink-faint">
+                              <Calendar className="h-3 w-3 shrink-0" aria-hidden="true" />
+                              {formatDate(init.deadline)}
+                            </span>
+                          )}
                         </div>
-                        {init.deadline && (
-                          <span className="inline-flex shrink-0 items-center gap-1.5 text-meta tabular-nums text-ink-faint">
-                            <Calendar className="h-3 w-3 shrink-0" aria-hidden="true" />
-                            {formatDate(init.deadline)}
-                          </span>
-                        )}
-                      </div>
 
-                      {init.description && (
-                        <p className="mt-1 line-clamp-2 max-w-3xl text-meta text-ink-faint">
-                          {init.description}
-                        </p>
-                      )}
+                        {init.description && (
+                          <p className="mt-1 line-clamp-2 max-w-3xl text-meta text-ink-faint">
+                            {init.description}
+                          </p>
+                        )}
+                      </Link>
                     </li>
                   ))}
                 </ul>
