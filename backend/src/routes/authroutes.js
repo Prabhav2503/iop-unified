@@ -7,6 +7,31 @@ import { tokengenerator, verifytoken } from "../utility/helper.js";
 dotenv.config();
 
 const router = express.Router();
+const AUTH_RATE_WINDOW_MS = 60 * 1000;
+const AUTH_RATE_MAX_REQUESTS = 120;
+const authRateBuckets = new Map();
+
+function authRateLimiter(req, res, next) {
+  const ipFromHeader = req.headers["x-forwarded-for"];
+  const clientIp = (Array.isArray(ipFromHeader) ? ipFromHeader[0] : ipFromHeader || req.ip || "unknown")
+    .toString()
+    .split(",")[0]
+    .trim();
+  const now = Date.now();
+  const currentBucket = authRateBuckets.get(clientIp);
+
+  if (!currentBucket || now - currentBucket.windowStart >= AUTH_RATE_WINDOW_MS) {
+    authRateBuckets.set(clientIp, { count: 1, windowStart: now });
+    return next();
+  }
+
+  if (currentBucket.count >= AUTH_RATE_MAX_REQUESTS) {
+    return res.status(429).json({ message: "Too many requests. Please try again later." });
+  }
+
+  currentBucket.count += 1;
+  return next();
+}
 
 router.post("/login", loginClientValidator, async (req, res) => {
   const errors = validationResult(req);
@@ -84,7 +109,7 @@ router.post("/logout", (req, res) => {
 });
 
 
-router.get("/me", async (req, res) => {
+router.get("/me", authRateLimiter, async (req, res) => {
   const token = req.cookies.token ? req.cookies.token : req.headers['token'];
   if (!token) {
     return res.status(401).json({ message: "Unauthorized: No token provided" });
